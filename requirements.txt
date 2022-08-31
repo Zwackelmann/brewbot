@@ -1,0 +1,8 @@
+pyserial
+matplotlib
+vispy
+pytest
+PyQt6
+numpy
+scipy
+flask
