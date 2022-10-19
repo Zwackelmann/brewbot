@@ -230,8 +230,8 @@ def get_pin(path, pin):
             return {'status': 'fail', 'msg': str(ex)}, 400
 
 
-@api.route('/<path:path>/status')
-def status(path):
+# @api.route('/<path:path>/status')
+def _status(path):
     try:
         port, baudrate = parse_path(path)
     except ValueError as ex:
@@ -251,9 +251,25 @@ def status(path):
 
 @api.route('/list-remotes')
 def list_remotes():
-    return {'status': 'success', 'remotes': [arduino_remote_vars(ard) for ard in arduino_remotes.values()]}, 200
+    ard_status = [{
+        'port': '/dev/abc', 'baudrate': 1000, 'pin_config': {'7': {'mode': 'in', 'ad': 'd'},
+                                                             'a0': {'mode': 'out', 'ad': 'a'}},
+        'in_buf_size': 128, 'heartbeat_rate': 0.01, 'read_interval': 0.05, 'min_read_sleep': 0.001,
+        'read_serial_timeout': 0.1}, {
+        'port': '/dev/xyz', 'baudrate': 2000, 'pin_config': {'8': {'mode': 'in', 'ad': 'd'},
+                                                             'a1': {'mode': 'out', 'ad': 'a'}},
+        'in_buf_size': 128, 'heartbeat_rate': 0.01, 'read_interval': 0.05, 'min_read_sleep': 0.001,
+        'read_serial_timeout': 0.1}]
+
+    return ard_status
+
+
+# @api.route('/list-remotes')
+# def list_remotes():
+#     return {'status': 'success', 'remotes': [arduino_remote_vars(ard) for ard in arduino_remotes.values()]}, 200
 
 
 @api.route('/list-ports')
 def list_ports():
-    return {'status': 'success', 'ports': list_files_with_prefix(Conf.valid_port_prefixes)}, 200
+    # return {'status': 'success', 'ports': list_files_with_prefix(Conf.valid_port_prefixes)}, 200
+    return {'status': 'success', 'ports': ['a', 'b', 'c']}, 200

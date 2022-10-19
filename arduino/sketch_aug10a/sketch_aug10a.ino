@@ -438,6 +438,7 @@ void clearSerialBuffer() {
 }
 
 void consume(byte i) {
+  // TODO add mod with buffer size after pos increment
   pos += i;
   nBuf -= i;
 }
