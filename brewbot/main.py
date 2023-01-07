@@ -109,13 +109,11 @@ def main2():
 
 
 def main():
-    with ArduinoRemote(pin_config={8: (PIN_OUTPUT, PIN_DIGITAL)}).cm() as ard:
+    with ArduinoRemote(pin_config={7: (PIN_OUTPUT, PIN_DIGITAL)}).cm() as ard:
         while True:
-            print('HIGH')
-            ard.set_pin(8, HIGH)
+            ard.set_pin(7, HIGH)
             time.sleep(1)
-            print('LOW')
-            ard.set_pin(8, LOW)
+            ard.set_pin(7, LOW)
             time.sleep(1)
 
 
