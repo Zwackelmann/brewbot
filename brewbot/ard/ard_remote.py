@@ -189,7 +189,8 @@ class ArduinoRemote:
                 if read_fails >= 3:
                     skipped_byte = self.buf.consume(1)
                     if self.file is not None:
-                        print(f"skipped {skipped_byte}", file=self.file)
+                        # print(f"skipped {skipped_byte}", file=self.file)
+                        pass
                     read_fails = 0
                 time.sleep(0.005)
             else:

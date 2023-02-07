@@ -24,6 +24,43 @@ class Conf(metaclass=__ConfMeta):
 
 arduino_remotes = {}
 
+_pin_mode_dict = {
+    PIN_INPUT: 'in',
+    PIN_OUTPUT: 'out'}
+
+_pin_ad_dict = {
+    PIN_ANALOG: 'a',
+    PIN_DIGITAL: 'd'
+}
+
+def pin_mode_to_str(pin_mode: int) -> str:
+    if pin_mode not in _pin_mode_dict:
+        raise ValueError(f"pin mode has to be one of {list(_pin_mode_dict.keys())} not {pin_mode}")
+
+    return _pin_mode_dict[pin_mode]
+
+def pin_mode_from_str(pin_mode: str) -> int:
+    r_dict = {v: k for k, v in _pin_mode_dict.items()}
+
+    if pin_mode not in r_dict:
+        raise ValueError(f"pin mode has to be one of {list(r_dict.keys())} not {pin_mode}")
+
+    return r_dict[pin_mode]
+
+def pin_ad_to_str(pin_ad: int) -> str:
+    if pin_ad not in _pin_ad_dict:
+        raise ValueError(f"pin ad has to be one of {list(_pin_ad_dict.keys())} not {pin_ad}")
+
+    return _pin_ad_dict[pin_ad]
+
+def pin_ad_from_str(pin_ad: str) -> int:
+    r_dict = {v: k for k, v in _pin_ad_dict.items()}
+
+    if pin_ad not in r_dict:
+        raise ValueError(f"pin ad has to be one of {list(r_dict.keys())} not {pin_ad}")
+
+    return r_dict[pin_ad]
+
 
 def parse_path(path, port_prefixes=None):
     if len(path) == 0:
@@ -78,26 +115,8 @@ def parse_arduino_remote_args(args):
         if not ArduinoRemote.is_valid_pin(p):
             raise ValueError(f"invalid pin format: {p}")
 
-    pin_mode = pin_config[1::3]
-    d = {'in': PIN_INPUT,
-         'out': PIN_OUTPUT}
-
-    for pm in pin_mode:
-        if pm not in d:
-            raise ValueError(f"pin mode has to be one of {list(d.keys())} not {pm}")
-
-    pin_mode = [d[pm] for pm in pin_mode]
-
-    d = {'a': PIN_ANALOG,
-         'd': PIN_DIGITAL}
-
-    anadigi = pin_config[2::3]
-    for ad in anadigi:
-        if ad not in d:
-            raise ValueError(f"anadigi has to be one of {list(d.keys())} not {ad}")
-
-    anadigi = [d[ad] for ad in anadigi]
-
+    pin_mode = [pin_mode_from_str(pm) for pm in pin_config[1::3]]
+    anadigi = [pin_ad_from_str(ad) for ad in pin_config[2::3]]
     pin_config = {p: (m, a) for p, m, a in zip(pins, pin_mode, anadigi)}
 
     return {'pin_config': pin_config, 'session': None, 'in_buf_size': in_buf_size, 'heartbeat_rate': heartbeat_rate,
@@ -106,7 +125,9 @@ def parse_arduino_remote_args(args):
 
 
 def arduino_remote_vars(ard):
-    return {'port': ard.port, 'baudrate': ard.baudrate, 'pin_config': ard.pin_config,
+    pin_config = {pin: {'mode': pin_mode_to_str(m), 'ad': pin_ad_to_str(ad)} for pin, (m, ad) in ard.pin_config.items()}
+
+    return {'port': ard.port, 'baudrate': ard.baudrate, 'pin_config': pin_config,
             'in_buf_size': ard.in_buf_size, 'heartbeat_rate': ard.heartbeat_rate,
             'read_interval': ard.read_interval, 'min_read_sleep': ard.min_read_sleep,
             'read_serial_timeout': ard.read_serial_timeout}
@@ -130,7 +151,9 @@ def new(path):
             ard.start_read_thread()
 
         arduino_remotes[(port, baudrate)] = ard
-        return {'status': 'success', 'session': ard.session}, 200
+        session = ard.session
+        # session = "12345"
+        return {'status': 'success', 'session': session}, 200
     except (ValueError, SerialException) as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
@@ -249,7 +272,7 @@ def _status(path):
         return {'status': 'fail', 'msg': 'remote not registered'}, 400
 
 
-@api.route('/list-remotes')
+"""@api.route('/list-remotes')
 def list_remotes():
     ard_status = [{
         'port': '/dev/abc', 'baudrate': 1000, 'pin_config': {'7': {'mode': 'in', 'ad': 'd'},
@@ -261,15 +284,15 @@ def list_remotes():
         'in_buf_size': 128, 'heartbeat_rate': 0.01, 'read_interval': 0.05, 'min_read_sleep': 0.001,
         'read_serial_timeout': 0.1}]
 
-    return ard_status
+    return ard_status"""
 
 
-# @api.route('/list-remotes')
-# def list_remotes():
-#     return {'status': 'success', 'remotes': [arduino_remote_vars(ard) for ard in arduino_remotes.values()]}, 200
+@api.route('/list-remotes')
+def list_remotes():
+    return {'status': 'success', 'remotes': {f"{ard.port}/{ard.baudrate}": arduino_remote_vars(ard) for ard in arduino_remotes.values()}}, 200
 
 
 @api.route('/list-ports')
 def list_ports():
-    # return {'status': 'success', 'ports': list_files_with_prefix(Conf.valid_port_prefixes)}, 200
-    return {'status': 'success', 'ports': ['a', 'b', 'c']}, 200
+    return {'status': 'success', 'ports': list_files_with_prefix(Conf.valid_port_prefixes)}, 200
+    # return {'status': 'success', 'ports': ['a', 'b', 'c']}, 200

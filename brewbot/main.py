@@ -108,13 +108,36 @@ def main2():
         app.run()
 
 
-def main():
-    with ArduinoRemote(pin_config={7: (PIN_OUTPUT, PIN_DIGITAL)}).cm() as ard:
+def main_relay():
+    with ArduinoRemote(port="/dev/ttyUSB0", pin_config={
+        2: (PIN_OUTPUT, PIN_DIGITAL),
+        3: (PIN_OUTPUT, PIN_DIGITAL),
+        "A6": (PIN_INPUT, PIN_ANALOG)
+    }).cm() as ard:
+        t = 0.0
         while True:
-            ard.set_pin(7, HIGH)
-            time.sleep(1)
-            ard.set_pin(7, LOW)
-            time.sleep(1)
+            if int(t / 5) % 2 == 0:
+                ard.set_pin(2, HIGH)
+                ard.set_pin(3, LOW)
+                print("high")
+            else:
+                ard.set_pin(2, LOW)
+                ard.set_pin(3, HIGH)
+                print("low")
+
+            print(ard.pin_values)
+            time.sleep(1.0)
+            t += 1.0
+
+def main():
+    with ArduinoRemote(port="/dev/ttyUSB0", pin_config={
+        2: (PIN_OUTPUT, PIN_DIGITAL)
+    }).cm() as ard:
+        while True:
+            ard.set_pin(2, HIGH)
+            time.sleep(0.1)
+            ard.set_pin(2, LOW)
+            time.sleep(0.1)
 
 
 def determine_poly(measurements):
