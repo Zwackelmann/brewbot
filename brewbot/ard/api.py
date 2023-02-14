@@ -1,10 +1,23 @@
 import os
 
 from flask import Blueprint, request, Response, current_app
-from brewbot.ard.ard_remote import ArduinoRemote, PIN_DIGITAL, PIN_ANALOG, PIN_OUTPUT, PIN_INPUT, HIGH, LOW
-from brewbot.util import validate_int, list_files_with_prefix, _ConfMeta
+from brewbot.ard.ard_remote import PIN_DIGITAL, PIN_ANALOG, PIN_OUTPUT, PIN_INPUT, HIGH, LOW
+from brewbot.util import validate_int, _ConfMeta
 from serial.serialutil import SerialException
 import time
+
+# set environment variable "MOCK" to "1" to use implementations from `mock` package.
+if os.environ["MOCK"] == '1':
+    # Mock of `ArduinoRemote` will never attempt to access the serial port. All functions interacting with the serial
+    # port will `pass` and/or return an empty result
+    from brewbot.mock.ard.ard_remote import ArduinoRemote
+
+    # Mock of `list_files_with_prefix` will return a list of files with that prefix adding a set list of suffixes
+    from brewbot.mock.util import list_files_with_prefix
+else:
+    from brewbot.ard.ard_remote import ArduinoRemote
+    from brewbot.util import list_files_with_prefix
+
 
 api = Blueprint('api', __name__)
 
@@ -82,8 +95,8 @@ def parse_path(path, port_prefixes=None):
     port = "/".join(path_parts[:-1])
     baudrate = path_parts[-1]
 
-    valid_prefixes = list_files_with_prefix(Conf.valid_port_prefixes)
-    if port not in valid_prefixes:
+    valid_ports = list_files_with_prefix(Conf.valid_port_prefixes)
+    if port not in valid_ports:
         raise ValueError(f"post must have one of prefixes {port_prefixes} got {port}")
 
     return port, validate_int(baudrate, valid_interval=(9600, 115200), varname='baudrate')
@@ -152,7 +165,6 @@ def new(path):
 
         arduino_remotes[(port, baudrate)] = ard
         session = ard.session
-        # session = "12345"
         return {'status': 'success', 'session': session}, 200
     except (ValueError, SerialException) as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
@@ -253,7 +265,7 @@ def get_pin(path, pin):
             return {'status': 'fail', 'msg': str(ex)}, 400
 
 
-# @api.route('/<path:path>/status')
+@api.route('/<path:path>/status')
 def _status(path):
     try:
         port, baudrate = parse_path(path)
@@ -272,27 +284,11 @@ def _status(path):
         return {'status': 'fail', 'msg': 'remote not registered'}, 400
 
 
-"""@api.route('/list-remotes')
-def list_remotes():
-    ard_status = [{
-        'port': '/dev/abc', 'baudrate': 1000, 'pin_config': {'7': {'mode': 'in', 'ad': 'd'},
-                                                             'a0': {'mode': 'out', 'ad': 'a'}},
-        'in_buf_size': 128, 'heartbeat_rate': 0.01, 'read_interval': 0.05, 'min_read_sleep': 0.001,
-        'read_serial_timeout': 0.1}, {
-        'port': '/dev/xyz', 'baudrate': 2000, 'pin_config': {'8': {'mode': 'in', 'ad': 'd'},
-                                                             'a1': {'mode': 'out', 'ad': 'a'}},
-        'in_buf_size': 128, 'heartbeat_rate': 0.01, 'read_interval': 0.05, 'min_read_sleep': 0.001,
-        'read_serial_timeout': 0.1}]
-
-    return ard_status"""
-
-
 @api.route('/list-remotes')
 def list_remotes():
-    return {'status': 'success', 'remotes': {f"{ard.port}/{ard.baudrate}": arduino_remote_vars(ard) for ard in arduino_remotes.values()}}, 200
+    return {'status': 'success', 'remotes': {ard.port: arduino_remote_vars(ard) for ard in arduino_remotes.values()}}, 200
 
 
 @api.route('/list-ports')
 def list_ports():
     return {'status': 'success', 'ports': list_files_with_prefix(Conf.valid_port_prefixes)}, 200
-    # return {'status': 'success', 'ports': ['a', 'b', 'c']}, 200

@@ -1,24 +1,44 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
-import config from './config.json'
-import Home from './Home'
-import ListRemotes from './ListRemotes'
-import ListPorts from './ListPorts'
-import AddRemoteForm from './AddRemoteForm';
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import {
+  createBrowserRouter,
+  RouterProvider,
+} from "react-router-dom";
+import Home from './Home';
+import Root from './Root';
+import Remotes from './Remotes';
+import App, {
+  loader as appLoader
+} from './App';
+import ErrorPage from "./error-page";
 
-const rootElement = ReactDOM.createRoot(document.getElementById('root'));
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Root />,
+    errorElement: <ErrorPage />,
+    children: [
+      {
+        path: "",
+        element: <Home />
+      },
+      {
+        path: "remotes",
+        element: <Remotes />
+      },
+      {
+        path: "app/*",
+        loader: ({ params }) => {
+          return params["*"];
+        },
+        element: <App />
+      }
+    ]
+  }
+]);
 
-rootElement.render(
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/list-remotes" element={<ListRemotes />} />
-        <Route path="/list-ports" element={<ListPorts />} />
-        <Route path="/add-remote" element={<AddRemoteForm />} />
-      </Routes>
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </React.StrictMode>
 );

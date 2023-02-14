@@ -8,6 +8,7 @@ import sys
 from brewbot.ard import msg_types, Buffer, MsgText, MsgBufDump, MsgAnalogOffset, MsgFail, MsgAwaitConfig, MsgSetState, \
     MsgConfigGetAnalogOffset, MsgConfigSession, MsgConfigPinmode, MsgConfigFinalize, MsgRead, MsgHeartbeat, MsgWrite
 from contextlib import contextmanager
+from functools import cached_property
 
 STATE_IDLE = 0xF0
 STATE_INIT_CONFIG = 0xF1
@@ -88,7 +89,6 @@ class ArduinoRemote:
         else:
             self.session = session
 
-        self.arduino = serial.Serial(port=port, baudrate=baudrate)
         self.read_thread = None
         self.read_stop_signal = False
         self.pin_values = {}
@@ -99,6 +99,10 @@ class ArduinoRemote:
         self.min_read_sleep = min_read_sleep
         self.read_serial_timeout = read_serial_timeout
         self.file = file
+
+    @cached_property
+    def arduino(self):
+        return serial.Serial(port=self.port, baudrate=self.baudrate)
 
     @contextmanager
     def cm(self):
