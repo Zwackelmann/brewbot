@@ -7,7 +7,7 @@ from serial.serialutil import SerialException
 import time
 
 # set environment variable "MOCK" to "1" to use implementations from `mock` package.
-if os.environ["MOCK"] == '1':
+if "MOCK" in os.environ and os.environ["MOCK"] == '1':
     # Mock of `ArduinoRemote` will never attempt to access the serial port. All functions interacting with the serial
     # port will `pass` and/or return an empty result
     from brewbot.mock.ard.ard_remote import ArduinoRemote
@@ -92,17 +92,17 @@ def parse_path(path, port_prefixes=None):
     if len(path_parts) < 2:
         raise ValueError('path is too short')
 
-    port = "/".join(path_parts[:-1])
-    baudrate = path_parts[-1]
+    port = "/".join(path_parts)
 
     valid_ports = list_files_with_prefix(Conf.valid_port_prefixes)
     if port not in valid_ports:
         raise ValueError(f"post must have one of prefixes {port_prefixes} got {port}")
 
-    return port, validate_int(baudrate, valid_interval=(9600, 115200), varname='baudrate')
+    return port
 
 
 def parse_arduino_remote_args(args):
+    baudrate = args.get('baudrate', default='115200')
     pin_config = args.get('pins', default='')
     in_buf_size = args.get('buf', default='128')
     heartbeat_rate = args.get('heartbeat', default='100')
@@ -110,6 +110,7 @@ def parse_arduino_remote_args(args):
     min_read_sleep = args.get('minreadsleep', default='1')
     read_serial_timeout = args.get('readserialtimeout', default='100')
 
+    baudrate = validate_int(baudrate, varname='baudrate')
     in_buf_size = validate_int(in_buf_size, valid_interval=(2**6, 2**12), varname='buf')
     heartbeat_rate = validate_int(heartbeat_rate, valid_interval=(1, None), varname='heartbeat') / 1000
     read_interval = validate_int(read_interval, valid_interval=(1, None), varname='readinterval') / 1000
@@ -132,8 +133,8 @@ def parse_arduino_remote_args(args):
     anadigi = [pin_ad_from_str(ad) for ad in pin_config[2::3]]
     pin_config = {p: (m, a) for p, m, a in zip(pins, pin_mode, anadigi)}
 
-    return {'pin_config': pin_config, 'session': None, 'in_buf_size': in_buf_size, 'heartbeat_rate': heartbeat_rate,
-            'read_interval': read_interval, 'min_read_sleep': min_read_sleep,
+    return {'baudrate': baudrate, 'pin_config': pin_config, 'session': None, 'in_buf_size': in_buf_size,
+            'heartbeat_rate': heartbeat_rate, 'read_interval': read_interval, 'min_read_sleep': min_read_sleep,
             'read_serial_timeout': read_serial_timeout}
 
 
@@ -149,12 +150,12 @@ def arduino_remote_vars(ard):
 @api.route('/<path:path>/new')
 def new(path):
     try:
-        port, baudrate = parse_path(path)
-        ard_kwargs = {**{'port': port, 'baudrate': baudrate}, **parse_arduino_remote_args(request.args)}
+        port = parse_path(path)
+        ard_kwargs = {**{'port': port}, **parse_arduino_remote_args(request.args)}
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
-    if any([p == port for p, _ in arduino_remotes.keys()]):
+    if any([p == port for p in arduino_remotes.keys()]):
         return {'status': 'fail', 'msg': 'port already in use'}, 400
 
     try:
@@ -163,7 +164,7 @@ def new(path):
         if any([c[0] == PIN_INPUT for c in ard.pin_config.values()]):
             ard.start_read_thread()
 
-        arduino_remotes[(port, baudrate)] = ard
+        arduino_remotes[port] = ard
         session = ard.session
         return {'status': 'success', 'session': session}, 200
     except (ValueError, SerialException) as ex:
@@ -173,22 +174,22 @@ def new(path):
 @api.route('/<path:path>/shutdown')
 def shutdown(path):
     try:
-        port, baudrate = parse_path(path)
+        port = parse_path(path)
         ignore_not_exists = 'ignore-not-exists' in request.args
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
-    if (port, baudrate) not in arduino_remotes:
+    if port not in arduino_remotes:
         if ignore_not_exists:
             return {'status': 'success'}, 200
         else:
             return {'status': 'fail', 'msg': 'remote not registered'}, 400
     else:
-        ard = arduino_remotes[(port, baudrate)]
+        ard = arduino_remotes[port]
 
     try:
         ard.stop_remote()
-        del arduino_remotes[(port, baudrate)]
+        del arduino_remotes[port]
         return {'status': 'success'}, 200
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
@@ -197,14 +198,14 @@ def shutdown(path):
 @api.route('/<path:path>/pin/<pin>/<value>')
 def set_pin(path, pin, value):
     try:
-        port, baudrate = parse_path(path)
+        port = parse_path(path)
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
-    if (port, baudrate) not in arduino_remotes:
+    if port not in arduino_remotes:
         return {'status': 'fail', 'msg': 'remote not registered'}, 400
     else:
-        ard = arduino_remotes[(port, baudrate)]
+        ard = arduino_remotes[port]
 
     if not ArduinoRemote.is_valid_pin(pin):
         return {'status': 'fail', 'msg': 'invalid pin format'}, 400
@@ -234,15 +235,15 @@ def set_pin(path, pin, value):
 @api.route('/<path:path>/pin/<pin>')
 def get_pin(path, pin):
     try:
-        port, baudrate = parse_path(path)
+        port = parse_path(path)
         stream = 'stream' in request.args
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
-    if (port, baudrate) not in arduino_remotes:
+    if port not in arduino_remotes:
         return {'status': 'fail', 'msg': 'remote not registered'}, 400
     else:
-        ard = arduino_remotes[(port, baudrate)]
+        ard = arduino_remotes[port]
 
     if not ArduinoRemote.is_valid_pin(pin):
         return {'status': 'fail', 'msg': 'invalid pin format'}, 400
@@ -268,12 +269,12 @@ def get_pin(path, pin):
 @api.route('/<path:path>/status')
 def _status(path):
     try:
-        port, baudrate = parse_path(path)
+        port = parse_path(path)
     except ValueError as ex:
         return {'status': 'fail', 'msg': str(ex)}, 400
 
-    if (port, baudrate) in arduino_remotes:
-        ard_status = arduino_remote_vars(arduino_remotes[(port, baudrate)])
+    if port in arduino_remotes:
+        ard_status = arduino_remote_vars(arduino_remotes[port])
         dm = {PIN_INPUT: 'in', PIN_OUTPUT: 'out'}
         da = {PIN_ANALOG: 'analog', PIN_DIGITAL: 'digital'}
         ard_status['pin_config'] = {k: {'mode': dm.get(m, m), 'ad': da.get(a, a)}
