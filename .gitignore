@@ -1,3 +1,5 @@
 .idea
 brewbot.iml
 __pycache__
+pcb/can-atmega/can-atmega-backups/
+pcb/can-atmega/fp-info-cache
