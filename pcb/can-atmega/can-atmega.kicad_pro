@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 2.2,
-          "height": 2.2,
-          "width": 2.2
+          "drill": 0.0,
+          "height": 3.8,
+          "width": 2.0
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -368,7 +368,7 @@
       "netlist": "can-atmega.net",
       "specctra_dsn": "temp-sensor.dsn",
       "step": "temp-sensor.step",
-      "vrml": "temp-sensor.wrl"
+      "vrml": "can-atmega.wrl"
     },
     "page_layout_descr_file": ""
   },
