@@ -1018,7 +1018,7 @@
   (symbol (lib_id "Device:R") (at 67.31 39.37 90) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 0186bdee-143a-4768-8c13-d163f780ad88)
-    (property "Reference" "R3" (id 0) (at 67.31 36.83 90))
+    (property "Reference" "R6" (id 0) (at 67.31 36.83 90))
     (property "Value" "5.1K" (id 1) (at 67.31 40.64 90)
       (effects (font (size 1.27 1.27)) (justify bottom))
     )
@@ -1041,7 +1041,7 @@
     (property "Value" "Screw_Terminal_01x02" (id 1) (at 99.0599 16.51 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
-    (property "Footprint" "TerminalBlock:TerminalBlock_bornier-2_P5.08mm" (id 2) (at 96.52 19.05 0)
+    (property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal" (id 2) (at 96.52 19.05 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 96.52 19.05 0)
@@ -1072,7 +1072,7 @@
   (symbol (lib_id "Device:R") (at 87.63 53.34 0) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 3362f1dc-45f1-4f3c-966f-894e97681dff)
-    (property "Reference" "R6" (id 0) (at 85.09 54.61 90)
+    (property "Reference" "R1" (id 0) (at 85.09 54.61 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "110K" (id 1) (at 90.17 55.88 90)
@@ -1191,7 +1191,7 @@
   (symbol (lib_id "Device:R") (at 80.01 39.37 90) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 6ffda4ba-a353-468a-8e5c-66b431ec911c)
-    (property "Reference" "R4" (id 0) (at 80.01 36.83 90))
+    (property "Reference" "R5" (id 0) (at 80.01 36.83 90))
     (property "Value" "330R" (id 1) (at 80.01 40.64 90)
       (effects (font (size 1.27 1.27)) (justify bottom))
     )
@@ -1266,7 +1266,7 @@
   (symbol (lib_id "Device:R") (at 67.31 46.99 270) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid a0c966ca-26d6-4690-917b-5f4512eab87e)
-    (property "Reference" "R1" (id 0) (at 67.31 44.45 90))
+    (property "Reference" "R3" (id 0) (at 67.31 44.45 90))
     (property "Value" "1.3K" (id 1) (at 67.31 49.53 90))
     (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (id 2) (at 67.31 45.212 90)
       (effects (font (size 1.27 1.27)) hide)
@@ -1296,7 +1296,7 @@
   (symbol (lib_id "Device:R") (at 87.63 33.02 0) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid c4be59be-7931-4777-93de-18f231b213e1)
-    (property "Reference" "R5" (id 0) (at 85.09 33.02 90))
+    (property "Reference" "R4" (id 0) (at 85.09 33.02 90))
     (property "Value" "5.1K" (id 1) (at 90.17 33.02 90))
     (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (id 2) (at 85.852 33.02 90)
       (effects (font (size 1.27 1.27)) hide)
@@ -1382,25 +1382,25 @@
       (reference "J1") (unit 2) (value "Connector_male") (footprint "CAN_ATmega:Connector_male")
     )
     (path "/173336f1-9601-4b41-8945-5c6f79af3be1"
-      (reference "J2") (unit 1) (value "Screw_Terminal_01x02") (footprint "TerminalBlock:TerminalBlock_bornier-2_P5.08mm")
+      (reference "J2") (unit 1) (value "Screw_Terminal_01x02") (footprint "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal")
     )
-    (path "/a0c966ca-26d6-4690-917b-5f4512eab87e"
-      (reference "R1") (unit 1) (value "1.3K") (footprint "Resistor_SMD:R_0805_2012Metric")
+    (path "/3362f1dc-45f1-4f3c-966f-894e97681dff"
+      (reference "R1") (unit 1) (value "110K") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
     (path "/9ccb8105-fc77-4b12-80e3-98af7225c931"
       (reference "R2") (unit 1) (value "10K") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
-    (path "/0186bdee-143a-4768-8c13-d163f780ad88"
-      (reference "R3") (unit 1) (value "5.1K") (footprint "Resistor_SMD:R_0805_2012Metric")
-    )
-    (path "/6ffda4ba-a353-468a-8e5c-66b431ec911c"
-      (reference "R4") (unit 1) (value "330R") (footprint "Resistor_SMD:R_0805_2012Metric")
+    (path "/a0c966ca-26d6-4690-917b-5f4512eab87e"
+      (reference "R3") (unit 1) (value "1.3K") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
     (path "/c4be59be-7931-4777-93de-18f231b213e1"
-      (reference "R5") (unit 1) (value "5.1K") (footprint "Resistor_SMD:R_0805_2012Metric")
+      (reference "R4") (unit 1) (value "5.1K") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
-    (path "/3362f1dc-45f1-4f3c-966f-894e97681dff"
-      (reference "R6") (unit 1) (value "110K") (footprint "Resistor_SMD:R_0805_2012Metric")
+    (path "/6ffda4ba-a353-468a-8e5c-66b431ec911c"
+      (reference "R5") (unit 1) (value "330R") (footprint "Resistor_SMD:R_0805_2012Metric")
+    )
+    (path "/0186bdee-143a-4768-8c13-d163f780ad88"
+      (reference "R6") (unit 1) (value "5.1K") (footprint "Resistor_SMD:R_0805_2012Metric")
     )
     (path "/59d51535-b0f8-4434-b2a3-1d9db5e1ebff"
       (reference "U1") (unit 1) (value "MCP6002-xSN") (footprint "Package_DIP:DIP-8_W7.62mm")

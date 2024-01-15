@@ -1,7 +1,7 @@
 (export (version "E")
   (design
     (source "/home/simon/repos/brewbot/pcb/can-atmega/can-atmega.kicad_sch")
-    (date "Thu 11 Jan 2024 07:53:40 PM CET")
+    (date "Mon 15 Jan 2024 12:26:55 PM CET")
     (tool "Eeschema 6.0.11+dfsg-1")
     (sheet (number "1") (name "/") (tstamps "/")
       (title_block
@@ -118,7 +118,7 @@
       (tstamps "ed6055be-54b0-42d7-90b0-8f70eadab11e"))
     (comp (ref "J1")
       (value "Screw_Terminal_01x02")
-      (footprint "TerminalBlock:TerminalBlock_bornier-2_P5.08mm")
+      (footprint "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal")
       (libsource (lib "Connector") (part "Screw_Terminal_01x02") (description "Generic screw terminal, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"))
       (property (name "Sheetname") (value ""))
       (property (name "Sheetfile") (value "can-atmega.kicad_sch"))
@@ -126,7 +126,7 @@
       (tstamps "71aba0ac-da00-46fc-b041-6f563b5b4142"))
     (comp (ref "J2")
       (value "Screw_Terminal_01x02")
-      (footprint "TerminalBlock:TerminalBlock_bornier-2_P5.08mm")
+      (footprint "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal")
       (libsource (lib "Connector") (part "Screw_Terminal_01x02") (description "Generic screw terminal, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"))
       (property (name "Sheetname") (value ""))
       (property (name "Sheetfile") (value "can-atmega.kicad_sch"))

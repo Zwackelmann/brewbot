@@ -10,3 +10,5 @@ pcb/lib/CAN_ATmega.pretty/
 pcb/motor-module/motor-module-backups/
 pcb/temp-module/fp-info-cache
 pcb/temp-module/temp-module-backups/
+pcb/motor-module/fp-info-cache
+pcb/temp-sensor/temp-sensor-backups/
