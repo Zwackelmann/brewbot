@@ -1,0 +1,9 @@
+lib/CAN-ATmega.bak
+
+fp-info-cache
+fp-lib-table
+*-backups/
+*.wrl
+*.net
+*.emn
+*.emp

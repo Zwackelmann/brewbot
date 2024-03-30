@@ -1,14 +1,3 @@
 .idea
 brewbot.iml
 __pycache__
-pcb/can-atmega/can-atmega-backups/
-pcb/can-atmega/fp-info-cache
-pcb/can-atmega/fp-lib-table
-pcb/fp-info-cache
-pcb/lib/CAN-ATmega.bak
-pcb/lib/CAN_ATmega.pretty/
-pcb/motor-module/motor-module-backups/
-pcb/temp-module/fp-info-cache
-pcb/temp-module/temp-module-backups/
-pcb/motor-module/fp-info-cache
-pcb/temp-sensor/temp-sensor-backups/

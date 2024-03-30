@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.762,
-          "height": 1.524,
-          "width": 1.524
+          "drill": 0.0,
+          "height": 3.8,
+          "width": 2.0
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -333,7 +333,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "motor-module.kicad_pro",
+    "filename": "can-atmega-02.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -363,12 +363,12 @@
   },
   "pcbnew": {
     "last_paths": {
-      "gencad": "",
-      "idf": "",
-      "netlist": "motor-module.net",
-      "specctra_dsn": "",
-      "step": "",
-      "vrml": "motor-module.wrl"
+      "gencad": "temp-sensor.cad",
+      "idf": "can-atmega-02.emn",
+      "netlist": "can-atmega-02.net",
+      "specctra_dsn": "temp-sensor.dsn",
+      "step": "temp-sensor.step",
+      "vrml": "can-atmega.wrl"
     },
     "page_layout_descr_file": ""
   },
@@ -412,7 +412,7 @@
   },
   "sheets": [
     [
-      "ba7c1404-03d7-4c86-9da7-c9d83cdd420c",
+      "768990ca-6065-471b-a359-455952f27b7f",
       ""
     ]
   ],
