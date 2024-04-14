@@ -364,7 +364,7 @@
   "pcbnew": {
     "last_paths": {
       "gencad": "temp-sensor.cad",
-      "idf": "temp-sensor.emn",
+      "idf": "can-atmega-02.emn",
       "netlist": "can-atmega.net",
       "specctra_dsn": "temp-sensor.dsn",
       "step": "temp-sensor.step",
