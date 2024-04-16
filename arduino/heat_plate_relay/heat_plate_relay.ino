@@ -30,22 +30,36 @@ void setup() {
   // Serial.begin(9600);
 }
 
+// SG_ RELAY_STATE : 0|1@1+ (1,0) [0|1] "" HEAT_PLATE
+#define RELAY_STATE_off 0
+#define RELAY_STATE_len 1
+uint8_t read_RELAY_STATE(uint8_t *data, size_t dlen) {
+  uint8_t num[] = {0x00};
+  const size_t nlen = 1;
+  
+  Util::project(data, dlen, num, nlen, RELAY_STATE_off, RELAY_STATE_len);
+  return Util::decode_uint8(num, nlen, RELAY_STATE_len);
+}
+
 void handle_can_frame(can_frame& frame) {
-  if (frame.data[0] == 0x00) {
+  uint8_t relay_state = read_RELAY_STATE(frame.data, CAN_DLC);
+
+  if (relay_state == 0) {
     digitalWrite(RELAY_PIN, LOW);
-  } else if (frame.data[0] == 0x01) {
+  } else if (relay_state == 1) {
     digitalWrite(RELAY_PIN, HIGH);
   }
 }
 
 void loop() {
   struct can_frame frame;
-  
+
   if (mcp2515.readMessage(&frame) == MCP2515::ERROR_OK) {
     uint32_t can_id = frame.can_id & CAN_ID_MASK;
 
     if(Util::can_id_to_pgn(can_id) == PGN &&
-       Util::can_id_to_src_addr(can_id) == SRC_ADDR // &&
+       Util::can_id_to_src_addr(can_id) == SRC_ADDR &&
+       frame.can_dlc == CAN_DLC // &&
        // Util::can_id_to_dest_addr(can_id) == DEST_ADDR &&
        // Util::can_id_to_priority(can_id) == PRIORITY
     ) {
