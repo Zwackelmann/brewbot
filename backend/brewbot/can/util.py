@@ -1,10 +1,3 @@
-import cantools
-import can
-
-# sudo ip link set can0 type can bitrate 125000
-# sudo ip link set up can0
-
-
 def pdu_format(pgn):
     return (pgn >> 8) & 0xFF
 
@@ -54,37 +47,3 @@ def can_id_to_pgn(can_id):
         dest_addr = 0x00
 
     return pgn, priority, src_addr, dest_addr
-
-
-def main():
-    db = cantools.database.load_file("messages.dbc")
-
-    can_bus = can.interface.Bus('can0', bustype='socketcan')
-    try:
-        """relay_msg = db.get_message_by_name("HEAT_PLATE")
-        signals = {"RELAY_STATE": 0x00}
-
-        message = can.Message(
-            arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, 0x80, 0x00),
-            data=relay_msg.encode(signals),
-            is_extended_id=True,
-            dlc=8
-        )
-
-        can_bus.send(message)"""
-
-        temp_msg = db.get_message_by_name("TEMP")
-
-        while True:
-            message = can_bus.recv()
-            pgn, priority, src_addr, dest_addr = can_id_to_pgn(message.arbitration_id)
-            if pgn == temp_msg.frame_id and src_addr == 0x70:
-                print(temp_msg.decode(message.data))
-    finally:
-        can_bus.shutdown()
-
-    print("hello")
-
-
-if __name__ == "__main__":
-    main()
