@@ -2,7 +2,7 @@ import can
 from brewbot.can.util import pgn_to_can_id, can_id_to_pgn
 
 
-def heat_plate_msg(db, on):
+def heat_plate_msg(db, on, src_addr):
     relay_msg = db.get_message_by_name("HEAT_PLATE")
 
     if on:
@@ -11,14 +11,14 @@ def heat_plate_msg(db, on):
         signals = {"RELAY_STATE": 0x00}
 
     return can.Message(
-        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, 0x80, 0x00),
+        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, src_addr, 0x00),
         data=relay_msg.encode(signals),
         is_extended_id=True,
         dlc=8
     )
 
 
-def motor_msg(db, on):
+def motor_msg(db, on, src_addr):
     relay_msg = db.get_message_by_name("MOTOR")
 
     if on:
@@ -27,7 +27,7 @@ def motor_msg(db, on):
         signals = {"RELAY_STATE": 0x00}
 
     return can.Message(
-        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, 0x80, 0x00),
+        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, src_addr, 0x00),
         data=relay_msg.encode(signals),
         is_extended_id=True,
         dlc=8

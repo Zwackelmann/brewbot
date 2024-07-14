@@ -1,0 +1,18 @@
+{
+  "can": {
+    "dbc_file": "conf/messages.dbc",
+    "interface": "can0"
+  },
+  "data": {
+    "temp": {
+      "src_addr": 112,
+      "measurements": "conf/measurements/temp_to_v"
+    },
+    "heat_plate": {
+      "src_addr": 128
+    },
+    "motor": {
+      "src_addr": 128
+    }
+  }
+}
