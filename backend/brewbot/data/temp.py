@@ -9,7 +9,7 @@ def read_temps(file):
     with open(file) as f:
         for line in f:
             parts = line.split()
-            measurements.append((float(parts[0]), int(parts[1])))
+            measurements.append((float(parts[0]), float(parts[1])))
     return measurements
 
 

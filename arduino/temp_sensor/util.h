@@ -13,7 +13,7 @@ public:
   static uint8_t can_id_to_priority(const uint32_t can_id);
 
   static void array_shift(uint8_t *data, size_t dlen, int by);
-  
+
   static uint8_t decode_uint8(uint8_t *data, size_t dlen, size_t bits);
   static uint32_t decode_uint32(uint8_t *data, size_t dlen, size_t bits);
   static int32_t decode_int32(uint8_t *data, size_t dlen, size_t bits);
@@ -21,7 +21,7 @@ public:
   static void encode_uint8(uint8_t n, size_t bits, uint8_t *num);
   static void encode_uint32(uint32_t n, size_t bits, uint8_t *num);
   static void encode_int32(int32_t n, size_t bits, uint8_t *num);
-  
+
   static void project(uint8_t *data, size_t dlen, uint8_t *num, size_t nlen, size_t off, size_t len);
   static void inject(uint8_t *data, size_t dlen, uint8_t *num, size_t nlen, size_t off, size_t len);
 };
@@ -58,7 +58,7 @@ uint32_t Util::pgn_to_can_id(const uint32_t pgn, const uint8_t priority, const u
   can_id |= ((uint32_t)(pf & 0xFF)) << 16;
   can_id |= ((uint32_t)(ps & 0xFF)) << 8;
   can_id |= ((uint32_t)(src_addr & 0xFF)) << 0;
-  
+
   return can_id;
 }
 
@@ -78,7 +78,7 @@ uint32_t Util::can_id_to_pgn(const uint32_t can_id) {
     dest_addr = (pgn & 0xFF);
     pgn = (pgn & 0x1FF00);
   } else {
-    dest_addr = 0x00;
+    dest_addr = 0xFF;
   }
 
   return pgn;
@@ -92,11 +92,11 @@ uint8_t Util::can_id_to_src_addr(const uint32_t can_id) {
 
 uint8_t Util::can_id_to_dest_addr(const uint32_t can_id) {
   uint32_t pgn = (can_id >> 8) & 0x1FFFF;
-  
+
   if(is_pdu_format_1(pgn)) {
     return pgn & 0xFF;
   } else {
-    return 0x00;
+    return 0xFF;
   }
 }
 
@@ -109,7 +109,7 @@ uint8_t Util::can_id_to_priority(const uint32_t can_id) {
 uint8_t Util::decode_uint8(uint8_t *data, size_t dlen, size_t bits) {
   size_t bits_in_type = 8;
   uint8_t max_uvalue = 0xFF;
-  
+
   size_t n_bytes = (bits / 8) + (bits % 8 == 0 ? 0 : 1);
 
   uint8_t n = 0;
@@ -124,7 +124,7 @@ uint8_t Util::decode_uint8(uint8_t *data, size_t dlen, size_t bits) {
 uint32_t Util::decode_uint32(uint8_t *data, size_t dlen, size_t bits) {
   size_t bits_in_type = 32;
   uint32_t max_uvalue = 0xFFFFFFFF;
-  
+
   size_t n_bytes = (bits / 8) + (bits % 8 == 0 ? 0 : 1);
 
   uint32_t n = 0;
@@ -283,7 +283,7 @@ void Util::project(uint8_t *data, size_t dlen, uint8_t *num, size_t nlen, size_t
 
   uint8_t tail_mask = 0xFF >> ((8 - (hi % 8)) % 8);
   num[0] = num[0] & tail_mask;
-  
+
   array_shift(num, nlen, lo%8);
 }
 
@@ -299,7 +299,7 @@ void Util::inject(uint8_t *data, size_t dlen, uint8_t *num, size_t nlen, size_t 
 
   mask_vec(mask, mlen, len, n_bytes);
   array_shift(mask, mlen, -(off%8));
-  
+
   size_t slen = mlen;
   uint8_t shift[slen];
   for(int i=0; i<(mlen-nlen); i++) {

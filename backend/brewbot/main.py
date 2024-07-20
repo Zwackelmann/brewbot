@@ -1,9 +1,11 @@
 import cantools
 from datetime import datetime
 import can
-from brewbot.can.messages import heat_plate_msg, motor_msg, parse_temp_msg
+from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
+                                  parse_motor_state_msg, parse_temp_state_msg)
 import time
-from brewbot.data.temp import TempState
+from brewbot.data.temp import TempState, read_temps
+from brewbot.config import load_config
 
 
 # sudo ip link set can0 type can bitrate 125000
@@ -11,32 +13,44 @@ from brewbot.data.temp import TempState
 
 
 def main():
-    db = cantools.database.load_file("conf/messages.dbc")
+    conf = load_config()
 
-    can_bus = can.interface.Bus('can0', interface='socketcan')
+    db = cantools.database.load_file("conf/messages.dbc")
+    can_bus = can.interface.Bus(conf["can"]["channel"], interface=conf["can"]["interface"])
 
     update_rate = 0.5
     last_update = None
-    temp_state = TempState(temp_to_v_file="conf/measurements/temp_to_v")
-
+    temp_state = TempState(temp_to_v_file=conf["data"]["temp"]["measurements"])
 
     try:
-        can_bus.send(heat_plate_msg(db, False))
-        can_bus.send(motor_msg(db, False))
+        can_bus.send(create_heat_plate_cmd_msg(db, False, conf["can"]["node_addr"]))
+        can_bus.send(create_motor_cmd_msg(db, False, conf["can"]["node_addr"]))
 
         while True:
             message = can_bus.recv()
-            temp_msg = parse_temp_msg(message, db, 0x70)
+            temp_msg = parse_temp_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["temp"]["node_addr"])
 
             if temp_msg is not None:
-                temp_state.put(temp_msg['TEMP_VOLTAGE'])
+                temp_state.put(temp_msg['TEMP_V'])
+                print("temp_c", temp_msg['TEMP_C'])
+                print("temp_v", temp_msg['TEMP_V'])
 
                 if last_update is None or last_update < (time.time() - update_rate):
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     print(f"{timestamp}: temp c: {temp_state.curr_c}")
-
                     last_update = time.time()
+
+            heat_plate_state_msg = parse_heat_plate_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["heat_plate"]["node_addr"])
+            if heat_plate_state_msg is not None:
+                print("heat_plate", heat_plate_state_msg)
+
+            motor_state_msg = parse_motor_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["motor"]["node_addr"])
+            if motor_state_msg is not None:
+                print("motor", motor_state_msg)
+
+            time.sleep(0.01)
+
     finally:
         can_bus.shutdown()
 

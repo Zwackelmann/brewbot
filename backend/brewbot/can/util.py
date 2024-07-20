@@ -44,6 +44,6 @@ def can_id_to_pgn(can_id):
         dest_addr = (pgn & 0xFF)
         pgn = (pgn & 0x1FF00)
     else:
-        dest_addr = 0x00
+        dest_addr = 0xFF
 
     return pgn, priority, src_addr, dest_addr

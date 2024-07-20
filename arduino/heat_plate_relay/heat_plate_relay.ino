@@ -3,10 +3,11 @@
 #include <mcp2515.h>
 #include "util.h"
 
-#define PGN        0xFFA0
-#define PRIORITY   6
-#define SRC_ADDR   0x80
-#define DEST_ADDR  0x00
+#define HEAT_PLATE_CMD_PGN    0xFFA0
+#define HEAT_PLATE_STATE_PGN  0xFFA1
+#define PRIORITY     6
+#define NODE_ADDR    0x80
+#define MASTER_ADDR  0x10
 
 #define RELAY_PIN      3
 #define LOOP_DELAY     5
@@ -16,12 +17,19 @@
 // 29 bit mask
 #define CAN_ID_MASK  0x1FFFFFFF
 
+#define SEND_STATUS_INTERVAL 100
+
 MCP2515 mcp2515(CS_PIN);
+uint8_t curr_relay_state;
+unsigned long next_status_send_time;
 
 void setup() {
   pinMode(RELAY_PIN, OUTPUT);
   // Set relay pin off initially
-  digitalWrite(RELAY_PIN, LOW);
+  curr_relay_state = 0x00;
+  next_status_send_time = millis();
+  
+  set_relay();
 
   mcp2515.reset();
   mcp2515.setBitrate(CAN_125KBPS, MCP_16MHZ);
@@ -30,7 +38,7 @@ void setup() {
   // Serial.begin(9600);
 }
 
-// SG_ RELAY_STATE : 0|1@1+ (1,0) [0|1] "" HEAT_PLATE
+// SG_ RELAY_STATE : 0|1@1+ (1,0) [0|1] "" HEAT_PLATE_NODE
 #define RELAY_STATE_off 0
 #define RELAY_STATE_len 1
 uint8_t read_RELAY_STATE(uint8_t *data, size_t dlen) {
@@ -41,31 +49,73 @@ uint8_t read_RELAY_STATE(uint8_t *data, size_t dlen) {
   return Util::decode_uint8(num, nlen, RELAY_STATE_len);
 }
 
-void handle_can_frame(can_frame& frame) {
-  uint8_t relay_state = read_RELAY_STATE(frame.data, CAN_DLC);
+// SG_ RELAY_STATE : 0|1@1+ (1,0) [0|1] "" MASTER_NODE
+#define RELAY_STATE_off 0
+#define RELAY_STATE_len 1
+void write_RELAY_STATE(uint8_t n, uint8_t *data, size_t dlen) {
+  uint8_t num[] = {0x00};
+  const size_t nlen = 1;
 
-  if (relay_state == 0) {
-    digitalWrite(RELAY_PIN, LOW);
-  } else if (relay_state == 1) {
-    digitalWrite(RELAY_PIN, HIGH);
-  }
+  Util::encode_uint8(n, RELAY_STATE_len, num);
+  Util::inject(data, dlen, num, nlen, RELAY_STATE_off, RELAY_STATE_len);
 }
 
-void loop() {
+void handle_relay_cmd(can_frame& frame) {
+  curr_relay_state = read_RELAY_STATE(frame.data, CAN_DLC);
+}
+
+void send_relay_status() {
+  struct can_frame frame;
+  frame.can_id = Util::pgn_to_can_id(HEAT_PLATE_STATE_PGN, PRIORITY, NODE_ADDR, 0xFF);
+  frame.can_id |= CAN_EFF_FLAG;
+
+  frame.can_dlc = CAN_DLC;
+  write_RELAY_STATE(curr_relay_state, frame.data, CAN_DLC);
+
+  mcp2515.sendMessage(&frame);
+}
+
+
+void read_loop() {
   struct can_frame frame;
 
   if (mcp2515.readMessage(&frame) == MCP2515::ERROR_OK) {
     uint32_t can_id = frame.can_id & CAN_ID_MASK;
-
-    if(Util::can_id_to_pgn(can_id) == PGN &&
-       Util::can_id_to_src_addr(can_id) == SRC_ADDR &&
-       frame.can_dlc == CAN_DLC // &&
-       // Util::can_id_to_dest_addr(can_id) == DEST_ADDR &&
-       // Util::can_id_to_priority(can_id) == PRIORITY
+    uint32_t msg_pgn = Util::can_id_to_pgn(can_id);
+    uint8_t msg_src = Util::can_id_to_src_addr(can_id);
+    uint8_t msg_dest = Util::can_id_to_dest_addr(can_id);
+    
+    if(msg_pgn == HEAT_PLATE_CMD_PGN &&
+       msg_src == MASTER_ADDR &&
+       frame.can_dlc == CAN_DLC &&
+       (msg_dest == 0xFF || msg_dest == NODE_ADDR)
     ) {
-      handle_can_frame(frame);
+      handle_relay_cmd(frame);
     }
   }
+}
 
+
+void write_loop() {
+  if (millis() > next_status_send_time) {
+    send_relay_status();
+    next_status_send_time = next_status_send_time + SEND_STATUS_INTERVAL;
+  }
+}
+
+
+void set_relay() {
+  if (curr_relay_state == 0x00) {
+    digitalWrite(RELAY_PIN, LOW);
+  } else if (curr_relay_state == 0x01) {
+    digitalWrite(RELAY_PIN, HIGH);
+  }
+}
+
+
+void loop() {
+  read_loop();
+  write_loop();
+  set_relay();
   delay(LOOP_DELAY);
 }

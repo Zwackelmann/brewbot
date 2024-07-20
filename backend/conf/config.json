@@ -1,7 +1,10 @@
 {
   "can": {
     "dbc_file": "conf/messages.dbc",
-    "interface": "can0"
+    "channel": "can0",
+    "interface": "socketcan",
+    "receive_timeout": 0.001,
+    "process_interval": 0.001
   },
   "data": {
     "temp": {

@@ -2,8 +2,14 @@ import can
 from brewbot.can.util import pgn_to_can_id, can_id_to_pgn
 
 
-def heat_plate_msg(db, on, src_addr):
-    relay_msg = db.get_message_by_name("HEAT_PLATE")
+def create_motor_cmd_msg(db, on, src_addr, dest_addr=None, priority=None):
+    if dest_addr is None:
+        dest_addr = 0xFF
+
+    if priority is None:
+        priority = 6
+
+    msg = db.get_message_by_name("MOTOR_CMD")
 
     if on:
         signals = {"RELAY_STATE": 0x01}
@@ -11,34 +17,88 @@ def heat_plate_msg(db, on, src_addr):
         signals = {"RELAY_STATE": 0x00}
 
     return can.Message(
-        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, src_addr, 0x00),
-        data=relay_msg.encode(signals),
+        arbitration_id=pgn_to_can_id(msg.frame_id, priority, src_addr, dest_addr),
+        data=msg.encode(signals),
         is_extended_id=True,
         dlc=8
     )
 
 
-def motor_msg(db, on, src_addr):
-    relay_msg = db.get_message_by_name("MOTOR")
-
-    if on:
-        signals = {"RELAY_STATE": 0x01}
-    else:
-        signals = {"RELAY_STATE": 0x00}
-
-    return can.Message(
-        arbitration_id=pgn_to_can_id(relay_msg.frame_id, 6, src_addr, 0x00),
-        data=relay_msg.encode(signals),
-        is_extended_id=True,
-        dlc=8
-    )
-
-
-def parse_temp_msg(message, db, src_addr=None):
-    temp_msg = db.get_message_by_name("TEMP")
+def parse_motor_state_msg(message, db, node_addr=None, assert_src_addr=None):
+    msg = db.get_message_by_name("MOTOR_STATE")
 
     pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(message.arbitration_id)
-    if pgn == temp_msg.frame_id and src_addr is None or src_addr == msg_src_addr:
-        return temp_msg.decode(message.data)
+
+    if pgn == msg.frame_id \
+            and (node_addr is None or msg_dest_addr == 0xFF or msg_dest_addr == node_addr) \
+            and (assert_src_addr is None or msg_src_addr == assert_src_addr):
+        return msg.decode(message.data)
+    else:
+        return None
+
+
+def create_heat_plate_cmd_msg(db, on, node_addr, dest_addr=None, priority=None):
+    if dest_addr is None:
+        dest_addr = 0xFF
+
+    if priority is None:
+        priority = 6
+
+    msg = db.get_message_by_name("HEAT_PLATE_CMD")
+
+    if on:
+        signals = {"RELAY_STATE": 0x01}
+    else:
+        signals = {"RELAY_STATE": 0x00}
+
+    return can.Message(
+        arbitration_id=pgn_to_can_id(msg.frame_id, priority, node_addr, dest_addr),
+        data=msg.encode(signals),
+        is_extended_id=True,
+        dlc=8
+    )
+
+
+def parse_heat_plate_state_msg(message, db, node_addr=None, assert_src_addr=None):
+    msg = db.get_message_by_name("HEAT_PLATE_STATE")
+
+    pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(message.arbitration_id)
+
+    if pgn == msg.frame_id \
+            and (node_addr is None or msg_dest_addr == 0xFF or msg_dest_addr == node_addr) \
+            and (assert_src_addr is None or msg_src_addr == assert_src_addr):
+        return msg.decode(message.data)
+    else:
+        return None
+
+
+def create_temp_state_msg(db, temp_c, temp_v, node_addr, dest_addr=None, priority=None):
+    if dest_addr is None:
+        dest_addr = 0xFF
+
+    if priority is None:
+        priority = 6
+
+    msg = db.get_message_by_name("TEMP_STATE")
+
+    signals = {"TEMP_C": temp_c, "TEMP_V": temp_v}
+
+    return can.Message(
+        arbitration_id=pgn_to_can_id(msg.frame_id, priority, node_addr, dest_addr),
+        data=msg.encode(signals),
+        is_extended_id=True,
+        dlc=8
+    )
+
+
+def parse_temp_state_msg(message, db, node_addr=None, assert_src_addr=None):
+    msg = db.get_message_by_name("TEMP_STATE")
+
+    pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(message.arbitration_id)
+
+    if pgn == msg.frame_id \
+            and (node_addr is None or msg_dest_addr == 0xFF or msg_dest_addr == node_addr) \
+            and (assert_src_addr is None or msg_src_addr == assert_src_addr):
+        return msg.decode(message.data)
     else:
         return None
