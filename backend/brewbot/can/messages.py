@@ -1,5 +1,6 @@
 import can
 from brewbot.can.util import pgn_to_can_id, can_id_to_pgn
+from brewbot.util import encode_on_off
 
 
 def create_motor_cmd_msg(db, on, src_addr, dest_addr=None, priority=None):
@@ -18,6 +19,24 @@ def create_motor_cmd_msg(db, on, src_addr, dest_addr=None, priority=None):
 
     return can.Message(
         arbitration_id=pgn_to_can_id(msg.frame_id, priority, src_addr, dest_addr),
+        data=msg.encode(signals),
+        is_extended_id=True,
+        dlc=8
+    )
+
+
+def create_motor_state_msg(db, on_off, node_addr, dest_addr=None, priority=None):
+    if dest_addr is None:
+        dest_addr = 0xFF
+
+    if priority is None:
+        priority = 6
+
+    msg = db.get_message_by_name("MOTOR_STATE")
+    signals = {"RELAY_STATE": encode_on_off(on_off)}
+
+    return can.Message(
+        arbitration_id=pgn_to_can_id(msg.frame_id, priority, node_addr, dest_addr),
         data=msg.encode(signals),
         is_extended_id=True,
         dlc=8
@@ -50,6 +69,24 @@ def create_heat_plate_cmd_msg(db, on, node_addr, dest_addr=None, priority=None):
         signals = {"RELAY_STATE": 0x01}
     else:
         signals = {"RELAY_STATE": 0x00}
+
+    return can.Message(
+        arbitration_id=pgn_to_can_id(msg.frame_id, priority, node_addr, dest_addr),
+        data=msg.encode(signals),
+        is_extended_id=True,
+        dlc=8
+    )
+
+
+def create_heat_plate_state_msg(db, on_off, node_addr, dest_addr=None, priority=None):
+    if dest_addr is None:
+        dest_addr = 0xFF
+
+    if priority is None:
+        priority = 6
+
+    msg = db.get_message_by_name("HEAT_PLATE_STATE")
+    signals = {"RELAY_STATE": encode_on_off(on_off)}
 
     return can.Message(
         arbitration_id=pgn_to_can_id(msg.frame_id, priority, node_addr, dest_addr),

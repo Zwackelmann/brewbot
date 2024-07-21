@@ -5,14 +5,16 @@ can:
   receive_timeout: 0.001
   process_interval: 0.001
   node_addr: 16  # 0x10
-data:
+signals:
   temp:
     node_addr: 112 # 0x70
-    measurements: "conf/measurements/temp_to_v2"
+    measurements: "conf/measurements/temp_to_v"
   heat_plate:
     node_addr: 128  # 0x80
   motor:
     node_addr: 129  # 0x81
 debug:
   mock:
-    can_bus: false
+    temp: true
+    motor: true
+    heat_plate: true

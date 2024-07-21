@@ -20,7 +20,7 @@ def main():
 
     update_rate = 0.5
     last_update = None
-    temp_state = TempState(temp_to_v_file=conf["data"]["temp"]["measurements"])
+    temp_state = TempState(temp_to_v_file=conf["signals"]["temp"]["measurements"])
 
     try:
         can_bus.send(create_heat_plate_cmd_msg(db, False, conf["can"]["node_addr"]))
@@ -28,7 +28,7 @@ def main():
 
         while True:
             message = can_bus.recv()
-            temp_msg = parse_temp_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["temp"]["node_addr"])
+            temp_msg = parse_temp_state_msg(message, db, conf["can"]["node_addr"], conf["signals"]["temp"]["node_addr"])
 
             if temp_msg is not None:
                 temp_state.put(temp_msg['TEMP_V'])
@@ -41,11 +41,11 @@ def main():
                     print(f"{timestamp}: temp c: {temp_state.curr_c}")
                     last_update = time.time()
 
-            heat_plate_state_msg = parse_heat_plate_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["heat_plate"]["node_addr"])
+            heat_plate_state_msg = parse_heat_plate_state_msg(message, db, conf["can"]["node_addr"], conf["signals"]["heat_plate"]["node_addr"])
             if heat_plate_state_msg is not None:
                 print("heat_plate", heat_plate_state_msg)
 
-            motor_state_msg = parse_motor_state_msg(message, db, conf["can"]["node_addr"], conf["data"]["motor"]["node_addr"])
+            motor_state_msg = parse_motor_state_msg(message, db, conf["can"]["node_addr"], conf["signals"]["motor"]["node_addr"])
             if motor_state_msg is not None:
                 print("motor", motor_state_msg)
 
