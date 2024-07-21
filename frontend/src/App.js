@@ -1,51 +1,61 @@
+// npm start
+
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchRequest, initRequest } from './features/ports/slice';
+import { tempActions } from './features/temp/slice';
+import { heatPlateActions } from './features/heatPlate/slice';
+import { motorActions } from './features/motor/slice';
 
 function App() {
   const dispatch = useDispatch();
-  const ports = useSelector((state) => state.ports.ports);
-  const loading = useSelector((state) => state.ports.loading);
-  const error = useSelector((state) => state.ports.error);
+  const temp_c = useSelector((state) => state.temp.temp.temp_c);
+  const error = useSelector((state) => state.temp.error );
+
+  const heatPlateState = useSelector((state) => state.heatPlate.state.data.relay_state);
+  const motorState = useSelector((state) => state.motor.state.data.relay_state);
 
   useEffect(() => {
-    dispatch(fetchRequest());
+    const interval = setInterval(() => {
+      dispatch(tempActions.fetchRequest());
+    }, 1000);
+    return () => clearInterval(interval);
   }, [dispatch]);
 
-  const handleInit = (port) => {
-    let req = initRequest(port);
-    console.log(req);
-    dispatch(req);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      dispatch(heatPlateActions.fetchState());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      dispatch(motorActions.fetchState());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
+  const dispatchHeatPlateCmd = (relayState) => () => {
+    dispatch(heatPlateActions.sendCmd(relayState));
   };
 
+  const dispatchMotorCmd = (relayState) => () => {
+    dispatch(motorActions.sendCmd(relayState));
+  };
+
+  if (error) {
+    return <div> Error: {error} </div>
+  }
+
   return (
-    <div className="App">
-      <h1>Ports</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      <table>
-        <thead>
-          <tr>
-            <th>Port</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Object.values(ports).sort().map((port, index) => (
-            <tr key={index}>
-              <td>{port.name}</td>
-              <td>{port.status || 'offline'}</td>
-              <td>
-                { port.status !== 'connected' && (
-                    <button onClick={ () => handleInit(port) }>New</button>
-                  )
-                }
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <p>Temperature: {temp_c} °C</p>
+      <p>Heat Plate: {heatPlateState}</p>
+      <button onClick={dispatchHeatPlateCmd('on')}>Turn on Heat Plate</button>
+      <button onClick={dispatchHeatPlateCmd('off')}>Turn off Heat Plate</button>
+      <p>Motor: {motorState}</p>
+      <button onClick={dispatchMotorCmd('on')}>Turn on Motor</button>
+      <button onClick={dispatchMotorCmd('off')}>Turn off Motor</button>
     </div>
   );
 }

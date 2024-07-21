@@ -1,8 +1,12 @@
 import { combineReducers } from '@reduxjs/toolkit';
-import portsReducer from '../features/ports/slice';
+import tempReducer from '../features/temp/slice';
+import heatPlateReducer from '../features/heatPlate/slice';
+import motorReducer from '../features/motor/slice';
 
 const rootReducer = combineReducers({
-  ports: portsReducer
+  temp: tempReducer,
+  heatPlate: heatPlateReducer,
+  motor: motorReducer
 });
 
 export default rootReducer;

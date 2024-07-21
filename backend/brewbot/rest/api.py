@@ -122,7 +122,7 @@ async def get_temp():
 def set_motor(on_off):
     if not app.state.conf["debug"]["mock"]["motor"]:
         msg = create_motor_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
-        app.state.can_bus.send(msg)
+        app.state.busses["can"].send(msg)
     else:
         app.state.debug["mock_sources"]["motor"].set_relay(on_off)
 
@@ -158,7 +158,7 @@ async def get_motor_state():
 def set_heat_plate(on_off):
     if not app.state.conf["debug"]["mock"]["heat_plate"]:
         msg = create_heat_plate_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
-        app.state.can_bus.send(msg)
+        app.state.busses["can"].send(msg)
     else:
         app.state.debug["mock_sources"]["heat_plate"].set_relay(on_off)
 

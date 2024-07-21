@@ -8,7 +8,6 @@ can:
 signals:
   temp:
     node_addr: 112 # 0x70
-    measurements: "conf/measurements/temp_to_v"
   heat_plate:
     node_addr: 128  # 0x80
   motor:

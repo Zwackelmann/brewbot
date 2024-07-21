@@ -2,18 +2,26 @@ import axios from 'axios';
 import qs from 'qs';
 
 const api = {
-  listPorts: async () => {
-    const response = await axios.get(`/api/list-ports`);
+  temp: async () => {
+    const response = await axios.get(`/api/temp`);
     return response.data;
   },
-  initializePort: async (port) => {
-    let qValues = {
-      baudrate: port.baudrate,
-      pins: "1,in,d"
-    }
-    const response = await axios.get(`/api/${port.name}/new?${qs.stringify(qValues)}`);
+  heatPlateCmd: (relayState) => (async () => {
+    const response = await axios.get(`/api/heat_plate/${relayState}`);
+    return response.data;
+  }),
+  heatPlateState: async () => {
+    const response = await axios.get(`/api/heat_plate`);
     return response.data;
   },
+  motorCmd: (relayState) => (async () => {
+    const response = await axios.get(`/api/motor/${relayState}`);
+    return response.data;
+  }),
+  motorState: async () => {
+    const response = await axios.get(`/api/motor`);
+    return response.data;
+  }
 };
 
 export default api;
