@@ -1,5 +1,3 @@
-// npm start
-
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { tempActions } from './features/temp/slice';
@@ -11,8 +9,8 @@ function App() {
   const temp_c = useSelector((state) => state.temp.temp.temp_c);
   const error = useSelector((state) => state.temp.error );
 
-  const heatPlateState = useSelector((state) => state.heatPlate.state.data.relay_state);
-  const motorState = useSelector((state) => state.motor.state.data.relay_state);
+  const heatPlateState = useSelector((state) => state.heatPlate.state.data.relayState);
+  const motorState = useSelector((state) => state.motor.state.data.relayState);
 
   useEffect(() => {
     const interval = setInterval(() => {

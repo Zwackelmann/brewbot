@@ -4,14 +4,14 @@ const initialState = {
   cmd: {
     pending: false,
     data: {
-      relay_state: null
+      relayState: null
     },
     error: null
   },
   state: {
     loading: false,
     data: {
-      relay_state: null
+      relayState: null
     },
     error: null
   }
@@ -27,7 +27,7 @@ const motorSlice = createSlice({
     },
     cmdSuccess(state, action) {
       state.cmd.pending = false
-      state.cmd.data = action.payload
+      state.cmd.data.relayState = action.payload.relay_state
       state.cmd.error = null
     },
     cmdFailure(state, action) {
@@ -39,7 +39,7 @@ const motorSlice = createSlice({
     },
     fetchSuccess(state, action) {
       state.state.loading = false
-      state.state.data = action.payload
+      state.state.data.relayState = action.payload.relay_state
       state.state.error = null
     },
     fetchFailure(state, action) {

@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 from dataclasses import dataclass, field
 import time
 

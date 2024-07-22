@@ -3,8 +3,9 @@ from datetime import datetime
 import can
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
+from brewbot.can.util import load_can_database
 import time
-from brewbot.data.temp import TempState, read_temps
+from brewbot.data.temp import TempState
 from brewbot.config import load_config
 
 
@@ -15,7 +16,7 @@ from brewbot.config import load_config
 def main():
     conf = load_config()
 
-    db = cantools.database.load_file("conf/messages.dbc")
+    db = load_can_database(conf["can"]["dbc_file"])
     can_bus = can.interface.Bus(conf["can"]["channel"], interface=conf["can"]["interface"])
 
     update_rate = 0.5

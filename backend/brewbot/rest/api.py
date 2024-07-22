@@ -1,4 +1,3 @@
-import cantools
 import asyncio
 import can
 from fastapi import FastAPI
@@ -6,6 +5,7 @@ from fastapi.responses import JSONResponse
 from brewbot.data.smoothing import Series
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
+from brewbot.can.util import load_can_database
 from brewbot.util import parse_on_off, format_on_off
 from brewbot.config import load_config
 from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlate, MockBus
@@ -15,6 +15,8 @@ from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlat
 # uvicorn brewbot.rest.api:app --reload
 
 app = FastAPI()
+# for IDE, since accessing `app.state` yielded warnings
+app.state = app.state
 
 mock_source_class = {
     "temp": MockSourceTemp,
@@ -41,16 +43,31 @@ def can_recv_step():
 
 
 def handle_message(message):
-    temp_msg = parse_temp_state_msg(message, app.state.dbc, app.state.conf["can"]["node_addr"], app.state.conf["signals"]["temp"]["node_addr"])
+    temp_msg = parse_temp_state_msg(
+        message,
+        app.state.dbc,
+        app.state.conf["can"]["node_addr"],
+        app.state.conf["signals"]["temp"]["node_addr"]
+    )
     if temp_msg is not None:
         app.state.signal_values["temp"]["temp_c"].put(temp_msg['TEMP_C'])
         app.state.signal_values["temp"]["temp_v"].put(temp_msg['TEMP_V'])
 
-    motor_state_msg = parse_motor_state_msg(message, app.state.dbc, app.state.conf["can"]["node_addr"], app.state.conf["signals"]["motor"]["node_addr"])
+    motor_state_msg = parse_motor_state_msg(
+        message,
+        app.state.dbc,
+        app.state.conf["can"]["node_addr"],
+        app.state.conf["signals"]["motor"]["node_addr"]
+    )
     if motor_state_msg is not None:
         app.state.signal_values["motor"] = {"relay_state": format_on_off(motor_state_msg["RELAY_STATE"])}
 
-    heat_plate_state_msg = parse_heat_plate_state_msg(message, app.state.dbc, app.state.conf["can"]["node_addr"], app.state.conf["signals"]["heat_plate"]["node_addr"])
+    heat_plate_state_msg = parse_heat_plate_state_msg(
+        message,
+        app.state.dbc,
+        app.state.conf["can"]["node_addr"],
+        app.state.conf["signals"]["heat_plate"]["node_addr"]
+    )
     if heat_plate_state_msg is not None:
         app.state.signal_values["heat_plate"] = {"relay_state": format_on_off(heat_plate_state_msg["RELAY_STATE"])}
 
@@ -62,7 +79,7 @@ def handle_message(message):
 @app.on_event("startup")
 async def read_config():
     app.state.conf = load_config()
-    app.state.dbc = cantools.database.load_file(app.state.conf["can"]["dbc_file"])
+    app.state.dbc = load_can_database(app.state.conf["can"]["dbc_file"])
     app.state.busses = {}
     app.state.tasks = {"can_recv": None, "mock_sources": {}}
 
@@ -115,7 +132,10 @@ async def get_temp():
     return {
         "action": "get_temp",
         "status": "success",
-        "data": {"temp_c": app.state.signal_values["temp"]["temp_c"].curr, "temp_v": app.state.signal_values["temp"]["temp_v"].curr}
+        "data": {
+            "temp_c": app.state.signal_values["temp"]["temp_c"].curr,
+            "temp_v": app.state.signal_values["temp"]["temp_v"].curr
+        }
     }
 
 
