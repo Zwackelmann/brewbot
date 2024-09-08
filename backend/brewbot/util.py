@@ -1,3 +1,15 @@
+import asyncio
+
+
+def async_infinite_loop(fun):
+    async def _coroutine():
+        while True:
+            try:
+                await fun()
+            except asyncio.CancelledError:
+                break
+    return _coroutine
+
 
 def parse_on_off(on_off):
     if on_off == "on":

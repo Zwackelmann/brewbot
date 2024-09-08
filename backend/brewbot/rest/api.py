@@ -10,7 +10,7 @@ from brewbot.data.pid import calculate_pd_error, duty_cycle
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
 from brewbot.can.util import load_can_database
-from brewbot.util import parse_on_off, format_on_off
+from brewbot.util import parse_on_off, format_on_off, async_infinite_loop
 from brewbot.config import load_config
 from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlate, MockBus
 
@@ -38,13 +38,10 @@ mock_source_class = {
 }
 
 
+@async_infinite_loop
 async def can_recv_loop():
-    while True:
-        try:
-            can_recv_step()
-            await asyncio.sleep(app.state.conf["can"]["process_interval"])
-        except asyncio.CancelledError:
-            break
+    can_recv_step()
+    await asyncio.sleep(app.state.conf["can"]["process_interval"])
 
 
 def can_recv_step():
@@ -91,39 +88,39 @@ def curr_temp():
         return np.polyval(poly, current_time)
 
 
+@async_infinite_loop
 async def control_heat_plate():
-    while True:
-        pwm_interval = app.state.conf["control"]["temp"]["pwm_interval"]
-        temp_setpoint = app.state.setpoint["temp"]
+    pwm_interval = app.state.conf["control"]["temp"]["pwm_interval"]
+    temp_setpoint = app.state.setpoint["temp"]
 
-        if temp_setpoint is None:
-            dc = 0.0
-        else:
-            dc = calc_duty_cycle(temp_setpoint)
+    if temp_setpoint is None:
+        dc = 0.0
+    else:
+        dc = calc_duty_cycle(temp_setpoint)
 
-        low_jump_thres = app.state.conf["control"]["temp"]["low_jump_thres"]
-        high_jump_thres = app.state.conf["control"]["temp"]["high_jump_thres"]
+    low_jump_thres = app.state.conf["control"]["temp"]["low_jump_thres"]
+    high_jump_thres = app.state.conf["control"]["temp"]["high_jump_thres"]
 
-        eps = 1e-6
-        if dc < (low_jump_thres - eps):
-            set_heat_plate("off")
-            await asyncio.sleep(pwm_interval)
-        elif (low_jump_thres - eps) <= dc <= (high_jump_thres + eps):
-            set_heat_plate("on")
-            await asyncio.sleep(pwm_interval * dc)
-            set_heat_plate("off")
-            await asyncio.sleep(pwm_interval * (1.0 - dc))
-        elif dc > (high_jump_thres + eps):
-            set_heat_plate("on")
-            await asyncio.sleep(pwm_interval)
-        else:
-            raise ValueError("invalid value for duty cycle")
+    eps = 1e-6
+    if dc < (low_jump_thres - eps):
+        set_heat_plate("off")
+        await asyncio.sleep(pwm_interval)
+    elif (low_jump_thres - eps) <= dc <= (high_jump_thres + eps):
+        set_heat_plate("on")
+        await asyncio.sleep(pwm_interval * dc)
+        set_heat_plate("off")
+        await asyncio.sleep(pwm_interval * (1.0 - dc))
+    elif dc > (high_jump_thres + eps):
+        set_heat_plate("on")
+        await asyncio.sleep(pwm_interval)
+    else:
+        raise ValueError("invalid value for duty cycle")
 
 
+@async_infinite_loop
 async def print_temp():
-    while True:
-        print(f"temp {curr_temp():4.1f}°C")
-        await asyncio.sleep(1.0)
+    print(f"temp {curr_temp():4.1f}°C")
+    await asyncio.sleep(1.0)
 
 
 def handle_message(message):
@@ -215,13 +212,17 @@ async def create_background_tasks(_app: FastAPI):
 async def cancel_background_tasks(_app: FastAPI):
     _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    if _app.state.tasks["can_recv"] is not None:
-        _app.state.tasks["can_recv"].cancel()
-        await _app.state.tasks["can_recv"]
+    tasks = [_app.state.tasks.get("can_recv"),
+             _app.state.tasks.get("control_heat_plate"),
+             _app.state.tasks.get("print_temp")]
 
-    for mock_source_task in _app.state.tasks["mock_sources"].values():
-        mock_source_task.cancel()
-        await mock_source_task
+    tasks.extend(_app.state.tasks["mock_sources"].values())
+
+    tasks = [_t for _t in tasks if _t is not None]
+
+    for task in tasks:
+        task.cancel()
+        await task
 
 
 @app.get("/temp")

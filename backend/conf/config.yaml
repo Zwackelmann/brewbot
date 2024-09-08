@@ -23,6 +23,6 @@ control:
     high_jump_thres: 0.8
 debug:
   mock:
-    temp: false
+    temp: true
     motor: true
-    heat_plate: false
+    heat_plate: true
