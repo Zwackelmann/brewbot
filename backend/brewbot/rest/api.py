@@ -5,7 +5,7 @@ import numpy as np
 from fastapi import FastAPI, Query
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from brewbot.data.smoothing import WindowedDataFrame
+from brewbot.data.df import WindowedDataFrame
 from brewbot.data.pid import calculate_pd_error, duty_cycle
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
