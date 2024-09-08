@@ -7,13 +7,22 @@ can:
   node_addr: 16  # 0x10
 signals:
   temp:
+    window: 10.0
     node_addr: 112 # 0x70
   heat_plate:
     node_addr: 128  # 0x80
   motor:
     node_addr: 129  # 0x81
+control:
+  temp:
+    p_gain: 0.5
+    d_gain: 5.0
+    max_cs: 7.0
+    pwm_interval: 5.0
+    low_jump_thres: 0.2
+    high_jump_thres: 0.8
 debug:
   mock:
-    temp: true
+    temp: false
     motor: true
-    heat_plate: true
+    heat_plate: false

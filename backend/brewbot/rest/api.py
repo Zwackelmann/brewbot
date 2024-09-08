@@ -1,8 +1,12 @@
 import asyncio
 import can
-from fastapi import FastAPI
+import time
+import numpy as np
+from fastapi import FastAPI, Query
+from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from brewbot.data.smoothing import Series
+from brewbot.data.smoothing import WindowedDataFrame
+from brewbot.data.pid import calculate_pd_error, duty_cycle
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
 from brewbot.can.util import load_can_database
@@ -14,9 +18,18 @@ from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlat
 # sudo ip link set up can0
 # uvicorn brewbot.rest.api:app --reload
 
-app = FastAPI()
-# for IDE, since accessing `app.state` yielded warnings
-app.state = app.state
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await read_config(_app)
+    await create_background_tasks(_app)
+    yield
+    await cancel_background_tasks(_app)
+
+
+app = FastAPI(lifespan=lifespan)
+app.state = app.state  # for IDE, since accessing `app.state` yielded warnings
+
 
 mock_source_class = {
     "temp": MockSourceTemp,
@@ -42,6 +55,77 @@ def can_recv_step():
             handle_message(message)
 
 
+def calc_duty_cycle(temp_setpoint):
+    df = app.state.signal_values["temp"]["temp_c"].df
+    window = app.state.conf["signals"]["temp"]["window"]
+    p, d = calculate_pd_error(temp_setpoint, df, time.time(), window)
+    p_gain = app.state.conf["control"]["temp"]["p_gain"]
+    d_gain = app.state.conf["control"]["temp"]["d_gain"]
+    cs = p * p_gain + d * d_gain
+
+    print(f"p-comp: {p * p_gain: 4.2f}  ==  d-comp: {d * d_gain: 4.2f}  ==  cs: {cs: 4.2f}")
+
+    max_cs = app.state.conf["control"]["temp"]["max_cs"]
+    low_jump_thres = app.state.conf["control"]["temp"]["low_jump_thres"]
+    high_jump_thres = app.state.conf["control"]["temp"]["high_jump_thres"]
+
+    return duty_cycle(cs, max_cs, low_jump_thres, high_jump_thres)
+
+
+def curr_temp():
+    df = app.state.signal_values["temp"]["temp_c"].df
+    window = app.state.conf["signals"]["temp"]["window"]
+    current_time = time.time()
+
+    if len(df) == 0:
+        return float("nan")
+
+    filtered_data = df.loc[(current_time - window):current_time]
+
+    if len(filtered_data) == 0:
+        return float("nan")
+    elif len(filtered_data) == 1:
+        return filtered_data.iloc[0]["y"]
+    else:
+        poly = np.polyfit(filtered_data.index.to_numpy(), filtered_data['y'].to_numpy(), 1)
+        return np.polyval(poly, current_time)
+
+
+async def control_heat_plate():
+    while True:
+        pwm_interval = app.state.conf["control"]["temp"]["pwm_interval"]
+        temp_setpoint = app.state.setpoint["temp"]
+
+        if temp_setpoint is None:
+            dc = 0.0
+        else:
+            dc = calc_duty_cycle(temp_setpoint)
+
+        low_jump_thres = app.state.conf["control"]["temp"]["low_jump_thres"]
+        high_jump_thres = app.state.conf["control"]["temp"]["high_jump_thres"]
+
+        eps = 1e-6
+        if dc < (low_jump_thres - eps):
+            set_heat_plate("off")
+            await asyncio.sleep(pwm_interval)
+        elif (low_jump_thres - eps) <= dc <= (high_jump_thres + eps):
+            set_heat_plate("on")
+            await asyncio.sleep(pwm_interval * dc)
+            set_heat_plate("off")
+            await asyncio.sleep(pwm_interval * (1.0 - dc))
+        elif dc > (high_jump_thres + eps):
+            set_heat_plate("on")
+            await asyncio.sleep(pwm_interval)
+        else:
+            raise ValueError("invalid value for duty cycle")
+
+
+async def print_temp():
+    while True:
+        print(f"temp {curr_temp():4.1f}°C")
+        await asyncio.sleep(1.0)
+
+
 def handle_message(message):
     temp_msg = parse_temp_state_msg(
         message,
@@ -50,8 +134,8 @@ def handle_message(message):
         app.state.conf["signals"]["temp"]["node_addr"]
     )
     if temp_msg is not None:
-        app.state.signal_values["temp"]["temp_c"].put(temp_msg['TEMP_C'])
-        app.state.signal_values["temp"]["temp_v"].put(temp_msg['TEMP_V'])
+        app.state.signal_values["temp"]["temp_c"].append({"t": [time.time()], "y": [temp_msg['TEMP_C']]})
+        app.state.signal_values["temp"]["temp_v"].append({"t": [time.time()], "y": [temp_msg['TEMP_V']]})
 
     motor_state_msg = parse_motor_state_msg(
         message,
@@ -76,53 +160,66 @@ def handle_message(message):
             app.state.debug["mock_sources"]["temp"].heating = heating
 
 
-@app.on_event("startup")
-async def read_config():
-    app.state.conf = load_config()
-    app.state.dbc = load_can_database(app.state.conf["can"]["dbc_file"])
-    app.state.busses = {}
-    app.state.tasks = {"can_recv": None, "mock_sources": {}}
+async def read_config(_app: FastAPI):
+    _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    app.state.signal_names = ["temp", "motor", "heat_plate"]
+    _app.state.conf = load_config()
+    _app.state.dbc = load_can_database(_app.state.conf["can"]["dbc_file"])
+    _app.state.busses = {}
+    _app.state.tasks = {"can_recv": None, "mock_sources": {}}
 
-    app.state.signal_values = {
-        "temp": {"temp_c": Series(), "temp_v": Series()},
+    _app.state.signal_names = ["temp", "motor", "heat_plate"]
+
+    temp_window = _app.state.conf["signals"]["temp"]["window"]
+    _app.state.signal_values = {
+        "temp": {
+            "temp_c": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t"),
+            "temp_v": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t")
+        },
         "motor": {"relay_state": None},
         "heat_plate": {"relay_state": None}
     }
 
-    app.state.debug = {"mock_sources": {}}
+    _app.state.setpoint = {
+        "temp": None
+    }
 
-    for signal_name in app.state.signal_names:
-        if app.state.conf["debug"]["mock"][signal_name]:
-            app.state.debug["mock_sources"][signal_name] = mock_source_class[signal_name](app.state.dbc)
+    _app.state.debug = {"mock_sources": {}}
+
+    for signal_name in _app.state.signal_names:
+        if _app.state.conf["debug"]["mock"][signal_name]:
+            _app.state.debug["mock_sources"][signal_name] = mock_source_class[signal_name](_app.state.dbc)
 
     # initiate real can bus, if one signal is not being mocked
-    if any(signal_name not in app.state.debug["mock_sources"] for signal_name in app.state.signal_names):
-        app.state.busses["can"] = can.interface.Bus(
-            app.state.conf["can"]["channel"],
-            interface=app.state.conf["can"]["interface"]
+    if any(signal_name not in _app.state.debug["mock_sources"] for signal_name in _app.state.signal_names):
+        _app.state.busses["can"] = can.interface.Bus(
+            _app.state.conf["can"]["channel"],
+            interface=_app.state.conf["can"]["interface"]
         )
 
-    mock_sources = [mock_source for mock_source in app.state.debug["mock_sources"].values()]
-    app.state.busses["mock"] = MockBus(mock_sources)
+    mock_sources = [mock_source for mock_source in _app.state.debug["mock_sources"].values()]
+    _app.state.busses["mock"] = MockBus(mock_sources)
 
 
-@app.on_event("startup")
-async def create_background_tasks():
-    for signal_name, mock_source in app.state.debug["mock_sources"].items():
-        app.state.tasks["mock_sources"][signal_name] = asyncio.create_task(mock_source.queue_messages())
+async def create_background_tasks(_app: FastAPI):
+    _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    app.state.tasks["can_recv"] = asyncio.create_task(can_recv_loop())
+    for signal_name, mock_source in _app.state.debug["mock_sources"].items():
+        _app.state.tasks["mock_sources"][signal_name] = asyncio.create_task(mock_source.queue_messages())
+
+    _app.state.tasks["can_recv"] = asyncio.create_task(can_recv_loop())
+    _app.state.tasks["control_heat_plate"] = asyncio.create_task(control_heat_plate())
+    _app.state.tasks["print_temp"] = asyncio.create_task(print_temp())
 
 
-@app.on_event("shutdown")
-async def cancel_background_tasks():
-    if app.state.tasks["can_recv"] is not None:
-        app.state.tasks["can_recv"].cancel()
-        await app.state.tasks["can_recv"]
+async def cancel_background_tasks(_app: FastAPI):
+    _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    for mock_source_task in app.state.tasks["mock_sources"].values():
+    if _app.state.tasks["can_recv"] is not None:
+        _app.state.tasks["can_recv"].cancel()
+        await _app.state.tasks["can_recv"]
+
+    for mock_source_task in _app.state.tasks["mock_sources"].values():
         mock_source_task.cancel()
         await mock_source_task
 
@@ -133,8 +230,8 @@ async def get_temp():
         "action": "get_temp",
         "status": "success",
         "data": {
-            "temp_c": app.state.signal_values["temp"]["temp_c"].curr,
-            "temp_v": app.state.signal_values["temp"]["temp_v"].curr
+            "temp_c": float(app.state.signal_values["temp"]["temp_c"].df['y'].median()),
+            "temp_v": float(app.state.signal_values["temp"]["temp_v"].df['y'].median())
         }
     }
 
@@ -176,7 +273,10 @@ async def get_motor_state():
 
 
 def set_heat_plate(on_off):
+    on_off = parse_on_off(on_off)
+
     if not app.state.conf["debug"]["mock"]["heat_plate"]:
+        print(f"heat plate: {format_on_off(on_off)}")
         msg = create_heat_plate_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
         app.state.busses["can"].send(msg)
     else:
@@ -208,4 +308,15 @@ async def get_heat_plate_state():
         "action": "get_heat_plate",
         "status": "success",
         "data": app.state.signal_values["heat_plate"]
+    }
+
+
+@app.get("/temp/set")
+async def set_temp_setpoint(r: float = Query(None, description="Desired temperature in Celsius")):
+    app.state.setpoint["temp"] = r
+
+    return {
+        "action": "set_temp_setpoint",
+        "status": "success",
+        "data": {"temp": r}
     }

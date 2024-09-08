@@ -1,21 +1,32 @@
-import numpy as np
-from typing import Tuple, List
-from dataclasses import dataclass, field
-import time
+import pandas as pd
 
 
-@dataclass
-class Series:
-    window: float = 1.0
-    values: List[Tuple[float, float]] = field(default_factory=list)
+class WindowedDataFrame:
+    def __init__(self, window, columns, index_column, init_data=None):
+        self.window = window
 
-    def put(self, v_temp):
-        self.values.append((time.time(), v_temp))
-        self.values = [(_t, _temp) for _t, _temp in self.values if _t > time.time() - self.window]
+        if init_data is None:
+            init_data = []
 
-    @property
-    def curr(self):
-        if len(self.values) == 0:
-            return None
+        self.df = pd.DataFrame(init_data, columns=columns).set_index(index_column)
+        self.columns = columns
+        self.index_column = index_column
+
+    def append(self, data, curr=None):
+        new_data = pd.DataFrame(data, columns=self.columns).set_index(self.index_column)
+
+        dfs = [_df for _df in [self.df, new_data] if len(_df) != 0]
+        if len(dfs) == 0:
+            self.df = pd.DataFrame([], columns=self.columns).set_index(self.index_column)
+        elif len(dfs) == 1:
+            self.df = dfs[0]
         else:
-            return np.median([_temp for _t, _temp in self.values])
+            self.df = pd.concat([self.df, new_data])
+
+        if curr is None:
+            curr = self.df.index[-1]
+
+        self._remove_old(curr)
+
+    def _remove_old(self, current_time: float):
+        self.df = self.df.loc[(current_time - self.window):current_time]
