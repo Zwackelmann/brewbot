@@ -7,6 +7,9 @@ from brewbot.calibrate.box_config_app import BoxConfigApp, capture_digits
 from brewbot.calibrate.can_temp_reader import CanTempReader
 import time
 import numpy as np
+import os
+import json
+import datetime
 
 
 @dataclass
@@ -25,6 +28,7 @@ class AppState:
     can_temp_reader: Optional[CanTempReader]
     can_temp_vs: list[(float, float)]
     temp_v_aggregate_time: float
+    recording_file: str
 
 
 async def update_input_image_task(app_state: AppState):
@@ -113,16 +117,28 @@ async def update_cam_task(app_state: AppState):
 
 
 async def output_task(app_state: AppState):
-    while not app_state.finished:
-        if "output" in app_state.active_components:
-            print(app_state.parsed_digit, float(np.mean([v for t, v in app_state.can_temp_vs])))
+    with open(app_state.recording_file, "w") as f:
+        while not app_state.finished:
+            if "output" in app_state.active_components:
+                real_temp_c = app_state.parsed_digit
+                can_temp_v = float(np.mean([v for t, v in app_state.can_temp_vs]))
 
-        await asyncio.sleep(1.0)
+                d = {
+                    "time": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "real_temp_c": real_temp_c,
+                    "can_temp_v": can_temp_v
+                }
+                print(d)
 
-    app_state.cam.release()
+                f.write(f"{json.dumps(d)}\n")
+                f.flush()
+
+            await asyncio.sleep(0.5)
 
 
 async def main():
+    time_str = time.strftime("%Y-%m-%dT%H-%M-%S", time.localtime())
+
     app_state = AppState(
         active_components={"tk_mainloop", "read_cam", "update_input_image"},
         finished=False,
@@ -148,7 +164,8 @@ async def main():
         parsed_digit=None,
         can_temp_reader = None,
         can_temp_vs = [],
-        temp_v_aggregate_time = 1.0
+        temp_v_aggregate_time = 1.0,
+        recording_file=os.path.join("recordings", f"rec_{time_str}.txt")
     )
 
     tasks = [

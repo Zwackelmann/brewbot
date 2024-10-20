@@ -1,7 +1,6 @@
 from brewbot.can.util import load_can_database
 from brewbot.can.messages import parse_temp_state_msg
 from brewbot.config import load_config
-from brewbot.util import async_infinite_loop
 import can
 
 
