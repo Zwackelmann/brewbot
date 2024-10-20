@@ -9,3 +9,5 @@ cantools
 uvicorn
 fastapi
 pandas
+opencv-python
+Pillow

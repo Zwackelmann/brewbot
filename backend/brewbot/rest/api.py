@@ -88,6 +88,25 @@ def curr_temp():
         return np.polyval(poly, current_time)
 
 
+def curr_temp_v():
+    df = app.state.signal_values["temp"]["temp_v"].df
+    window = app.state.conf["signals"]["temp"]["window"]
+    current_time = time.time()
+
+    if len(df) == 0:
+        return float("nan")
+
+    filtered_data = df.loc[(current_time - window):current_time]
+
+    if len(filtered_data) == 0:
+        return float("nan")
+    elif len(filtered_data) == 1:
+        return filtered_data.iloc[0]["y"]
+    else:
+        poly = np.polyfit(filtered_data.index.to_numpy(), filtered_data['y'].to_numpy(), 1)
+        return np.polyval(poly, current_time)
+
+
 @async_infinite_loop
 async def control_heat_plate():
     pwm_interval = app.state.conf["control"]["temp"]["pwm_interval"]
@@ -119,7 +138,7 @@ async def control_heat_plate():
 
 @async_infinite_loop
 async def print_temp():
-    print(f"temp {curr_temp():4.1f}°C")
+    print(f"temp {curr_temp_v():4.3f} V, {curr_temp():4.1f}°C")
     await asyncio.sleep(1.0)
 
 
@@ -277,7 +296,7 @@ def set_heat_plate(on_off):
     on_off = parse_on_off(on_off)
 
     if not app.state.conf["debug"]["mock"]["heat_plate"]:
-        print(f"heat plate: {format_on_off(on_off)}")
+        # print(f"heat plate: {format_on_off(on_off)}")
         msg = create_heat_plate_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
         app.state.busses["can"].send(msg)
     else:

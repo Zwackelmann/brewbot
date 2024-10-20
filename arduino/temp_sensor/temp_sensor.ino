@@ -21,14 +21,17 @@
 // maximum value for analog voltage reading
 #define VINT_MAX ((1 << 10) - 1)
 // sloap for voltage to temperature conversion
-#define V_TO_TEMP_M 23.69448038
+#define V_TO_TEMP_M 27.68973046
 // constant shift for voltage to temperature conversion
-#define V_TO_TEMP_B -4.59983094
+#define V_TO_TEMP_B -12.67088669
 
 #define SEND_STATUS_INTERVAL 100
 
 MCP2515 mcp2515(CS_PIN);
 unsigned long next_status_send_time;
+
+uint32_t vint_sum = 0;
+uint32_t n_samples = 0;
 
 void setup() {
   pinMode(TEMP_VOLTAGE_PIN, INPUT);
@@ -40,6 +43,24 @@ void setup() {
   mcp2515.setNormalMode();
 
   // Serial.begin(9600);
+}
+
+void read_sample() {
+  vint_sum += analogRead(TEMP_VOLTAGE_PIN);
+  n_samples += 1;
+}
+
+double curr_v() {
+  uint32_t vint = vint_sum / n_samples;
+  return ((double)vint * V_MAX) / VINT_MAX;
+}
+
+double fetch_and_reset_v() {
+  double v = curr_v();
+  vint_sum = 0;
+  n_samples = 0;
+
+  return v;
 }
 
 // SG_ TEMP_C : 0|16@1- (0.01,0) [-327.68|327.67] "C" MASTER_NODE
@@ -68,11 +89,8 @@ void write_TEMP_V(double v, uint8_t *data, size_t dlen) {
   Util::inject(data, dlen, num, nlen, TEMP_V_off, TEMP_V_len);
 }
 
-
 void send_temp_status() {
-  uint32_t temp_vint = analogRead(TEMP_VOLTAGE_PIN);
-
-  double temp_v = ((double)temp_vint * V_MAX) / VINT_MAX;
+  double temp_v = fetch_and_reset_v();
   double temp_c = (temp_v * V_TO_TEMP_M) + V_TO_TEMP_B;
 
   struct can_frame frame;
@@ -86,16 +104,13 @@ void send_temp_status() {
   mcp2515.sendMessage(&frame);
 }
 
+void loop() {
+  read_sample();
 
-void write_loop() {
   if (millis() > next_status_send_time) {
     send_temp_status();
     next_status_send_time = next_status_send_time + SEND_STATUS_INTERVAL;
   }
-}
 
-
-void loop() {
-  write_loop();
   delay(LOOP_DELAY);
 }

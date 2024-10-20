@@ -1,0 +1,167 @@
+from dataclasses import dataclass
+from typing import Optional
+import asyncio
+import tkinter as tk
+from brewbot.calibrate.cam import Cam
+from brewbot.calibrate.box_config_app import BoxConfigApp, capture_digits
+from brewbot.calibrate.can_temp_reader import CanTempReader
+import time
+import numpy as np
+
+
+@dataclass
+class AppState:
+    active_components: set[str]
+    finished: bool
+    digit_boxes: list[((int, int), (int, int), (int, int), (int, int))]
+    preview_image_dims: (int, int)
+    digit_image_dims: (int, int)
+    digit_segment_boxes: list[((float, float, float, float), int)]
+    tk_root: Optional[tk.Tk]
+    box_config_app: Optional[BoxConfigApp]
+    cam: Cam
+    show_capture_digits_debug_windows: bool
+    parsed_digit: Optional[int]
+    can_temp_reader: Optional[CanTempReader]
+    can_temp_vs: list[(float, float)]
+    temp_v_aggregate_time: float
+
+
+async def update_input_image_task(app_state: AppState):
+    while not app_state.finished:
+        if "update_input_image" in app_state.active_components and app_state.tk_root is not None:
+            app_state.box_config_app.update_input_image(app_state.cam.image)
+
+        await asyncio.sleep(0.1)
+
+
+async def capture_digits_task(app_state: AppState):
+    while not app_state.finished:
+        if "capture_digits" in app_state.active_components:
+            num = capture_digits(
+                app_state.cam.image,
+                app_state.digit_boxes,
+                app_state.digit_image_dims,
+                app_state.digit_segment_boxes,
+                app_state.show_capture_digits_debug_windows
+            )
+            app_state.parsed_digit = num
+
+        await asyncio.sleep(0.5)
+
+
+async def update_can_task(app_state: AppState):
+    if app_state.can_temp_reader is None:
+        app_state.can_temp_reader = CanTempReader()
+
+    while not app_state.finished:
+        if "update_can" in app_state.active_components:
+            temp_msg = app_state.can_temp_reader.recv()
+            if temp_msg is not None:
+                can_temp_vs = app_state.can_temp_vs
+                can_temp_vs.append((time.time(), temp_msg['TEMP_V']))
+                can_temp_vs = [(t, v) for t, v in can_temp_vs if (time.time() - t) < app_state.temp_v_aggregate_time]
+                app_state.can_temp_vs = can_temp_vs
+
+        await asyncio.sleep(0.01)
+
+
+async def tk_mainloop_task(app_state: AppState):
+    def init():
+        app_state.tk_root = tk.Tk()
+        app_state.box_config_app = BoxConfigApp(
+            app_state.preview_image_dims,
+            app_state.digit_image_dims,
+            app_state.digit_segment_boxes
+        )
+        app_state.box_config_app.create_widgets(app_state.tk_root, app_state.digit_boxes)
+
+    def update():
+        app_state.tk_root.update()
+        app_state.digit_boxes = [dv.get() for dv in app_state.box_config_app.digit_box_vars]
+
+    def destroy():
+        app_state.tk_root = None
+        app_state.bbox_config_app = None
+        app_state.active_components.discard("tk_mainloop")
+        app_state.active_components.discard("update_input_image")
+        app_state.active_components.add("capture_digits")
+        app_state.active_components.add("output")
+        app_state.active_components.add("update_can")
+
+    while not app_state.finished:
+        if "tk_mainloop" in app_state.active_components:
+            if app_state.tk_root is None:
+                init()
+            try:
+                update()
+                if not app_state.tk_root.winfo_exists():
+                    destroy()
+            except tk.TclError:
+                destroy()
+
+        await asyncio.sleep(0.01)
+
+
+async def update_cam_task(app_state: AppState):
+    while not app_state.finished:
+        if "read_cam" in app_state.active_components:
+            app_state.cam.update()
+        await asyncio.sleep(0.1)
+
+    app_state.cam.release()
+
+
+async def output_task(app_state: AppState):
+    while not app_state.finished:
+        if "output" in app_state.active_components:
+            print(app_state.parsed_digit, float(np.mean([v for t, v in app_state.can_temp_vs])))
+
+        await asyncio.sleep(1.0)
+
+    app_state.cam.release()
+
+
+async def main():
+    app_state = AppState(
+        active_components={"tk_mainloop", "read_cam", "update_input_image"},
+        finished=False,
+        digit_boxes = [
+            ((273, 83), (342, 83), (332, 195), (264, 196)),
+            ((344, 84), (411, 83), (400, 195), (335, 195))
+        ],
+        preview_image_dims=(512, 512),
+        digit_image_dims=(256, 128),
+        digit_segment_boxes=[
+            (( 0.25, 0.00, 0.50, 0.20), 1),
+            (( 0.00, 0.15, 0.40, 0.30), 0),
+            (( 0.60, 0.15, 0.40, 0.30), 0),
+            (( 0.25, 0.40, 0.50, 0.22), 1),
+            (( 0.00, 0.56, 0.40, 0.30), 0),
+            (( 0.60, 0.56, 0.40, 0.30), 0),
+            (( 0.25, 0.80, 0.50, 0.20), 1)
+        ],
+        tk_root = None,
+        box_config_app = None,
+        cam = Cam(0),
+        show_capture_digits_debug_windows = False,
+        parsed_digit=None,
+        can_temp_reader = None,
+        can_temp_vs = [],
+        temp_v_aggregate_time = 1.0
+    )
+
+    tasks = [
+        asyncio.create_task(tk_mainloop_task(app_state)),
+        asyncio.create_task(update_cam_task(app_state)),
+        asyncio.create_task(update_input_image_task(app_state)),
+        asyncio.create_task(capture_digits_task(app_state)),
+        asyncio.create_task(update_can_task(app_state)),
+        asyncio.create_task(output_task(app_state))
+    ]
+
+    await asyncio.gather(*tasks)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
