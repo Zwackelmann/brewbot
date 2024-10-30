@@ -1,3 +1,4 @@
 .idea
 brewbot.iml
 __pycache__
+/backend/recordings/*.txt

@@ -271,6 +271,8 @@ def segments_to_number(segments):
         return 8
     elif segments == [True,  True,  True,  True,  False, True, True ]:
         return 9
+    elif segments == [False,  False,  False,  False,  False, False, False]:
+        return "blank"
     else:
         return None
 
@@ -333,6 +335,8 @@ def capture_digits(frame, digit_boxes, digit_image_dims, digit_segment_boxes, sh
 
 
 def digits_to_num(digits):
+    digits = [d for d in digits if d != "blank"]
+
     if len(digits) == 0:
         return None
 

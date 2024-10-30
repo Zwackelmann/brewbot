@@ -140,7 +140,7 @@ async def main():
     time_str = time.strftime("%Y-%m-%dT%H-%M-%S", time.localtime())
 
     app_state = AppState(
-        active_components={"tk_mainloop", "read_cam", "update_input_image"},
+        active_components={"tk_mainloop", "read_cam", "update_can", "update_input_image"},
         finished=False,
         digit_boxes = [
             ((273, 83), (342, 83), (332, 195), (264, 196)),

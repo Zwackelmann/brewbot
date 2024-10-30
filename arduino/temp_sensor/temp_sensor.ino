@@ -17,13 +17,15 @@
 #define CAN_ID_MASK  0x1FFFFFFF
 
 // voltage assumed when analog read returns maximum value
-#define V_MAX 5.0
+#define V_MAX 5.033
 // maximum value for analog voltage reading
 #define VINT_MAX ((1 << 10) - 1)
-// sloap for voltage to temperature conversion
-#define V_TO_TEMP_M 27.68973046
-// constant shift for voltage to temperature conversion
-#define V_TO_TEMP_B -12.67088669
+// x^2 coefficient for v_to_temp function
+#define V_TO_TEMP_X2 2.32935514
+// x^1 coefficient for v_to_temp function
+#define V_TO_TEMP_X1 40.94134041
+// x^0 coefficient for v_to_temp function
+#define V_TO_TEMP_X0 -56.70878437
 
 #define SEND_STATUS_INTERVAL 100
 
@@ -91,7 +93,7 @@ void write_TEMP_V(double v, uint8_t *data, size_t dlen) {
 
 void send_temp_status() {
   double temp_v = fetch_and_reset_v();
-  double temp_c = (temp_v * V_TO_TEMP_M) + V_TO_TEMP_B;
+  double temp_c = (temp_v * temp_v * V_TO_TEMP_X2) + (temp_v * V_TO_TEMP_X1) + V_TO_TEMP_X0;
 
   struct can_frame frame;
   frame.can_id = Util::pgn_to_can_id(TEMP_STATE_PNG, PRIORITY, NODE_ADDR, 0xFF);
