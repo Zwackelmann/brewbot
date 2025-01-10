@@ -3,11 +3,6 @@
 #include <mcp2515.h>
 #include "util.h"
 
-#define TEMP_STATE_PNG  0xFFC1
-#define PRIORITY     6
-#define NODE_ADDR    0x70
-#define MASTER_ADDR  0x10
-
 #define TEMP_VOLTAGE_PIN  A0
 #define LOOP_DELAY         5
 #define CAN_DLC            8
@@ -20,14 +15,35 @@
 #define V_MAX 5.033
 // maximum value for analog voltage reading
 #define VINT_MAX ((1 << 10) - 1)
-// x^2 coefficient for v_to_temp function
-#define V_TO_TEMP_X2 2.32935514
-// x^1 coefficient for v_to_temp function
-#define V_TO_TEMP_X1 40.94134041
-// x^0 coefficient for v_to_temp function
-#define V_TO_TEMP_X0 -56.70878437
 
 #define SEND_STATUS_INTERVAL 100
+
+#define BOARD_ID 1
+
+#if BOARD_ID == 1
+  #define TEMP_STATE_PNG  0xFFC1
+  #define NODE_ADDR    0x70
+
+  // x^2 coefficient for v_to_temp function
+  #define V_TO_TEMP_X2 3.0980205
+  // x^1 coefficient for v_to_temp function
+  #define V_TO_TEMP_X1 35.82164965
+  // x^0 coefficient for v_to_temp function
+  #define V_TO_TEMP_X0 -49.55763119
+#elif BOARD_ID == 2
+  #define TEMP_STATE_PNG  0xFFC2
+  #define NODE_ADDR    0x71
+  
+  // x^2 coefficient for v_to_temp function
+  #define V_TO_TEMP_X2 1.97914111
+  // x^1 coefficient for v_to_temp function
+  #define V_TO_TEMP_X1 41.73056052
+  // x^0 coefficient for v_to_temp function
+  #define V_TO_TEMP_X0 -57.66374902
+#endif
+
+#define PRIORITY     6
+#define MASTER_ADDR  0x10
 
 MCP2515 mcp2515(CS_PIN);
 unsigned long next_status_send_time;
