@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import UnivariateSpline
@@ -16,6 +16,7 @@ class RecSequence:
     slc: slice
     temp_spline_divider: int
     voltage_filter_sigma: float
+    post_smooth_slc: slice
 
 
 @dataclass
@@ -111,6 +112,10 @@ def smoothed_plot(recs, dfs, ax1):
         temps_smooth = temp_spline(time_smooth)
         voltages_smooth = gaussian_filter1d(voltage, sigma=rec.voltage_filter_sigma)
 
+        time_smooth = time_smooth[rec.post_smooth_slc]
+        temps_smooth = temps_smooth[rec.post_smooth_slc]
+        voltages_smooth = voltages_smooth[rec.post_smooth_slc]
+
         volt_to_temp_df = pd.DataFrame({'voltage': voltages_smooth, 'temp': temps_smooth})
         bin_width = 0.1
         temp_bins = np.arange(volt_to_temp_df['temp'].min(), volt_to_temp_df['temp'].max() + bin_width, bin_width)
@@ -138,43 +143,134 @@ def smoothed_plot(recs, dfs, ax1):
     poly = np.polyfit(voltages_bins, temps_bins, deg=2)
     print(poly)
 
-    # vs = np.linspace(np.min(voltages_bins), np.max(voltages_bins))
-    # ts = np.polyval(poly, vs)
+    vs = np.linspace(np.min(voltages_bins), np.max(voltages_bins))
+    ts = np.polyval(poly, vs)
 
-    # ax1.scatter(voltages_bins, temps_bins, color="blue")
-    # ax1.plot(vs, ts, color="red")
+    plt_type = "scatter"
 
-    ax1.plot(times, temps, color='skyblue')
-    ax1.plot(times_smooth, temps_smooth, color="blue")
-    ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel('Real Temp (C)', color='blue')
-    ax1.tick_params(axis='y', labelcolor='blue')
+    if plt_type == 'scatter':
+        ax1.scatter(voltages_bins, temps_bins, color="blue")
+        ax1.plot(vs, ts, color="red")
 
-    ax2 = ax1.twinx()
-    ax2.plot(times, voltages, color='pink')
-    ax2.plot(times_smooth, voltages_smooth, color='red')
-    ax2.set_ylabel('CAN Temp (V)', color='red')
-    ax2.tick_params(axis='y', labelcolor='red')
+    if plt_type == 'spline':
+        ax1.plot(times, temps, color='skyblue')
+        ax1.plot(times_smooth, temps_smooth, color="blue")
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Real Temp (C)', color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+
+        ax2 = ax1.twinx()
+        ax2.plot(times, voltages, color='pink')
+        ax2.plot(times_smooth, voltages_smooth, color='red')
+        ax2.set_ylabel('CAN Temp (V)', color='red')
+        ax2.tick_params(axis='y', labelcolor='red')
 
     plt.xticks(rotation=45)
 
 
 def main():
     group_name = "3k OP Amp"
-    recs = [
-        RecSequence(
-            file_path="recordings/rec_2024-10-28T15-51-55.txt",
-            slc=slice(100, 42000),
+
+    # V3 board 1 SMD 10nF capacitor at input signal
+    recs_v3_board_1 = [
+        RecSequence(  # heat up to 100 deg
+            file_path="recordings/rec_2024-11-05T19-53-04.txt",
+            slc=slice(940, 3400),
             temp_spline_divider=10,
-            voltage_filter_sigma=20
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(100, 2400)
         ),
-        RecSequence(
-            file_path="recordings/rec_2024-10-29T09-13-42.txt",
-            slc=slice(4000, None),
+        RecSequence(  # heat up to 100 deg 2
+            file_path="recordings/rec_2024-11-05T22-17-24.txt",
+            slc=slice(700, None),
             temp_spline_divider=10,
-            voltage_filter_sigma=750.0
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(100, 3200)
+        ),
+        RecSequence(  # cool down in bucket
+            file_path="recordings/rec_2024-11-05T22-52-03.txt",
+            slc=slice(550, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=75,
+            post_smooth_slc=slice(200, 2600)
+        ),
+        RecSequence(  # cool down in bucket 2
+            file_path="recordings/rec_2024-11-06T07-23-46.txt",
+            slc=slice(825, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=75,
+            post_smooth_slc=slice(400, 23000)
+        ),
+        RecSequence(  # cool down in bucket 3
+            file_path="recordings/rec_2024-11-06T10-57-04.txt",
+            slc=slice(800, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=75,
+            post_smooth_slc=slice(400, 23000)
+        ),
+        RecSequence(  # warm up from ice in bucket 1
+            file_path="recordings/rec_2024-11-06T14-29-43.txt",
+            slc=slice(7000, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=600,
+            post_smooth_slc=slice(2500, 48000)
         )
     ]
+
+    # V3 board 2 SMD 10nF capacitor at input signal
+    recs_v3_board_2 = [
+        RecSequence(  # cool down in bucket
+            file_path="recordings/rec_2024-11-07T15-25-52.txt",
+            slc=slice(700, 19000),
+            temp_spline_divider=10,
+            voltage_filter_sigma=100,
+            post_smooth_slc=slice(150, 17500)
+        ),
+        RecSequence(  # cool down in bucket 2
+            file_path="recordings/rec_2024-11-07T18-57-46.txt",
+            slc=slice(450, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(150, 15500)
+        ),
+        RecSequence(  # cool down in bucket 3
+            file_path="recordings/rec_2024-11-07T21-16-18.txt",
+            slc=slice(500, 17000),
+            temp_spline_divider=10,
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(200, 16000)
+        ),
+        RecSequence(  # heat in kettle
+            file_path="recordings/rec_2024-11-08T19-45-15.txt",
+            slc=slice(900, 8000),
+            temp_spline_divider=10,
+            voltage_filter_sigma=75,
+            post_smooth_slc=slice(100, 6800)
+        ),
+        RecSequence(  # heat in kettle 2
+            file_path="recordings/rec_2024-11-08T21-04-08.txt",
+            slc=slice(600, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(200, 10000)
+        ),
+        RecSequence(  # heat in kettle 3
+            file_path="recordings/rec_2024-11-08T22-34-59.txt",
+            slc=slice(600, 9000),
+            temp_spline_divider=10,
+            voltage_filter_sigma=50,
+            post_smooth_slc=slice(100, 8000)
+        ),
+        RecSequence(  # ice bucket
+            file_path="recordings/rec_2024-11-09T07-38-31.txt",
+            slc=slice(7000, 94000),
+            temp_spline_divider=10,
+            voltage_filter_sigma=600,
+            post_smooth_slc=slice(3000, 75000)
+        )
+    ]
+
+    recs = recs_v3_board_2
 
     # show_plot = "temp_to_v"
     # show_plot = "time"
@@ -190,7 +286,7 @@ def main():
             df['time'] = pd.to_datetime(df['time'], errors='coerce')
             df = df.astype({"real_temp_c": "float64", "can_temp_v": "float64"})
             df = df.set_index("time")
-            df.loc[(df['real_temp_c'] < 1), 'real_temp_c'] = df['real_temp_c'] + 100
+            df.loc[(df['real_temp_c'] < 3), 'real_temp_c'] = df['real_temp_c'] + 100
             df['can_temp_v'] = df['can_temp_v'] * v_factor
             df['real_temp_c_smoothed'] = df['real_temp_c'].rolling(window=rolling_window, center=True).median()
             df['real_temp_c_interpolated'] = df['real_temp_c_smoothed'].interpolate(method='linear')
@@ -213,6 +309,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig('temp_plot.png')
+    plt.show()
 
 
 def main2():
@@ -253,6 +350,7 @@ def main3():
 
     plt.plot(temp, v)
     plt.savefig('temp_v.png')
+    plt.show()
 
     print(v)
 

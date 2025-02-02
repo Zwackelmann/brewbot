@@ -1,6 +1,3 @@
-import cantools
-
-
 def pdu_format(pgn):
     return (pgn >> 8) & 0xFF
 
@@ -50,7 +47,3 @@ def can_id_to_pgn(can_id):
         dest_addr = 0xFF
 
     return pgn, priority, src_addr, dest_addr
-
-
-def load_can_database(file):
-    return getattr(cantools, "database").load_file(file)

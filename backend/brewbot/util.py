@@ -12,12 +12,26 @@ def async_infinite_loop(fun):
 
 
 def parse_on_off(on_off):
-    if on_off == "on":
-        return True
-    elif on_off == "off":
-        return False
+    if on_off is None:
+        return ValueError(f"unsupported value: {on_off}")
+    elif isinstance(on_off, bool):
+        return on_off
+    elif isinstance(on_off, int):
+        if on_off == 0x00:
+            return False
+        elif on_off == 0x01:
+            return True
+        else:
+            return ValueError(f"unsupported value: {on_off}")
+    elif isinstance(on_off, str):
+        if on_off == "on":
+            return True
+        elif on_off == "off":
+            return False
+        else:
+            raise ValueError("value must be either 'on' or 'off'")
     else:
-        raise ValueError("value must be either 'on' or 'off'")
+        return ValueError(f"unsupported type: {type(on_off)}")
 
 
 def format_on_off(on_off):

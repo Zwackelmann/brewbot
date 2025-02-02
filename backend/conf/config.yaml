@@ -4,25 +4,98 @@ can:
   interface: "socketcan"
   receive_timeout: 0.001
   process_interval: 0.001
+message_types:
+- key: "temp_state"
+  priority: 6
+  signals:
+  - key: "temp_c"
+    signal_name: "TEMP_C"
+    tpe: "float"
+  - key: "temp_v"
+    signal_name: "TEMP_V"
+    tpe: "float"
+- key: "relay_state"
+  priority: 6
+  signals:
+  - key: "on"
+    signal_name: "RELAY_STATE"
+    tpe: "flag"
+- key: "relay_cmd"
+  priority: 6
+  signals:
+  - key: "on"
+    signal_name: "RELAY_STATE"
+    tpe: "flag"
+node_types:
+- key: "master"
+  messages: []
+- key: "thermometer"
+  messages:
+  - key: "temp_state"
+    msg_type_ref: "temp_state"
+    direction: "rx"
+- key: "relay"
+  messages:
+  - key: "relay_state"
+    msg_type_ref: "relay_state"
+    direction: "rx"
+  - key: "relay_cmd"
+    msg_type_ref: "relay_cmd"
+    direction: "tx"
+nodes:
+- key: "master"
+  name: "MASTER_NODE"
+  node_type_ref: "master"
   node_addr: 16  # 0x10
+  message_bindings: []
+  debug: {}
+- key: "thermometer_1"
+  name: "TEMP_NODE_1"
+  node_type_ref: "thermometer"
+  node_addr: 112 # 0x70
+  message_bindings:
+  - ref_key: "temp_state"
+    dbc_msg: "TEMP_STATE_1"
+  debug:
+    mock: true
+- key: "thermometer_2"
+  name: "TEMP_NODE_2"
+  node_type_ref: "thermometer"
+  node_addr: 113 # 0x71
+  message_bindings:
+  - ref_key: "temp_state"
+    dbc_msg: "TEMP_STATE_2"
+  debug:
+    mock: true
+- key: "motor_1"
+  name: "MOTOR_NODE_1"
+  node_type_ref: "relay"
+  node_addr: 128 # 0x80
+  message_bindings:
+  - ref_key: "relay_state"
+    dbc_msg: "MOTOR_STATE_1"
+  - ref_key: "relay_cmd"
+    dbc_msg: "MOTOR_CMD_1"
+  debug:
+    mock: true
+- key: "heat_plate_1"
+  name: "HEAT_PLATE_NODE_1"
+  node_type_ref: "relay"
+  node_addr: 129 # 0x81
+  message_bindings:
+  - ref_key: "relay_state"
+    dbc_msg: "HEAT_PLATE_STATE_1"
+  - ref_key: "relay_cmd"
+    dbc_msg: "HEAT_PLATE_CMD_1"
+  debug:
+    mock: true
 signals:
   temp:
     window: 10.0
-    node_addr: 112 # 0x70
-  heat_plate:
-    node_addr: 128  # 0x80
-  motor:
-    node_addr: 129  # 0x81
-control:
-  temp:
-    p_gain: 0.5
-    d_gain: 5.0
-    max_cs: 7.0
-    pwm_interval: 5.0
-    low_jump_thres: 0.2
-    high_jump_thres: 0.8
-debug:
-  mock:
-    temp: true
-    motor: true
-    heat_plate: true
+    controller:
+      p_gain: 0.5
+      d_gain: 5.0
+      max_cs: 7.0
+      pwm_interval: 5.0
+      low_jump_thres: 0.2
+      high_jump_thres: 0.8

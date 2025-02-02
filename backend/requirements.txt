@@ -11,3 +11,4 @@ fastapi
 pandas
 opencv-python
 Pillow
+pydantic

@@ -25,7 +25,8 @@ class AppState:
     cam: Cam
     show_capture_digits_debug_windows: bool
     parsed_digit: Optional[int]
-    can_temp_reader: Optional[CanTempReader]
+    can_temp_node_names: list[str]
+    can_temp_readers: dict[str, CanTempReader]
     can_temp_vs: list[(float, float)]
     temp_v_aggregate_time: float
     recording_file: str
@@ -55,17 +56,21 @@ async def capture_digits_task(app_state: AppState):
 
 
 async def update_can_task(app_state: AppState):
-    if app_state.can_temp_reader is None:
-        app_state.can_temp_reader = CanTempReader()
+    for node_name in app_state.can_temp_node_names:
+        if node_name not in app_state.can_temp_readers:
+            app_state.can_temp_readers[node_name] = CanTempReader(node_name)
 
     while not app_state.finished:
         if "update_can" in app_state.active_components:
-            temp_msg = app_state.can_temp_reader.recv()
-            if temp_msg is not None:
-                can_temp_vs = app_state.can_temp_vs
-                can_temp_vs.append((time.time(), temp_msg['TEMP_V']))
-                can_temp_vs = [(t, v) for t, v in can_temp_vs if (time.time() - t) < app_state.temp_v_aggregate_time]
-                app_state.can_temp_vs = can_temp_vs
+            for node_name, temp_reader in app_state.can_temp_readers.items():
+                temp_msg = temp_reader.recv()
+                if temp_msg is not None:
+                    can_temp_vs = app_state.can_temp_vs
+                    can_temp_vs.append((time.time(), temp_msg['TEMP_V']))
+                    can_temp_vs = [(t, v) for t, v in can_temp_vs if (time.time() - t) < app_state.temp_v_aggregate_time]
+                    app_state.can_temp_vs = can_temp_vs
+
+                    print(node_name, temp_msg['TEMP_C'])
 
         await asyncio.sleep(0.01)
 
@@ -159,22 +164,23 @@ async def main():
         ],
         tk_root = None,
         box_config_app = None,
-        cam = Cam(0),
+        cam = None, # Cam(0),
         show_capture_digits_debug_windows = False,
         parsed_digit=None,
-        can_temp_reader = None,
+        can_temp_readers = {},
+        can_temp_node_names = ["temp_1", "temp_2"],
         can_temp_vs = [],
         temp_v_aggregate_time = 1.0,
         recording_file=os.path.join("recordings", f"rec_{time_str}.txt")
     )
 
     tasks = [
-        asyncio.create_task(tk_mainloop_task(app_state)),
-        asyncio.create_task(update_cam_task(app_state)),
-        asyncio.create_task(update_input_image_task(app_state)),
-        asyncio.create_task(capture_digits_task(app_state)),
+        # asyncio.create_task(tk_mainloop_task(app_state)),
+        # asyncio.create_task(update_cam_task(app_state)),
+        # asyncio.create_task(update_input_image_task(app_state)),
+        # asyncio.create_task(capture_digits_task(app_state)),
         asyncio.create_task(update_can_task(app_state)),
-        asyncio.create_task(output_task(app_state))
+        # asyncio.create_task(output_task(app_state))
     ]
 
     await asyncio.gather(*tasks)

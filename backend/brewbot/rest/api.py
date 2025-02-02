@@ -9,10 +9,10 @@ from brewbot.data.df import WindowedDataFrame
 from brewbot.data.pid import calculate_pd_error, duty_cycle
 from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
                                   parse_motor_state_msg, parse_temp_state_msg)
-from brewbot.can.util import load_can_database
 from brewbot.util import parse_on_off, format_on_off, async_infinite_loop
 from brewbot.config import load_config
 from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlate, MockBus
+from can import Message as CanMessage
 
 # sudo ip link set can0 type can bitrate 125000
 # sudo ip link set up can0
@@ -187,11 +187,15 @@ async def read_config(_app: FastAPI):
     _app.state.signal_names = ["temp", "motor", "heat_plate"]
 
     temp_window = _app.state.conf["signals"]["temp"]["window"]
+    num_temp_nodes = len(_app.state.conf["signals"]["temp"]["nodes"])
+
     _app.state.signal_values = {
-        "temp": {
-            "temp_c": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t"),
-            "temp_v": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t")
-        },
+        "temp": [
+            {
+              "temp_c": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t"),
+              "temp_v": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t")
+            } for _ in range(num_temp_nodes)
+        ],
         "motor": {"relay_state": None},
         "heat_plate": {"relay_state": None}
     }

@@ -1,6 +1,53 @@
 import can
 from brewbot.can.util import pgn_to_can_id, can_id_to_pgn
 from brewbot.util import encode_on_off
+from brewbot.config import Node, BoundMessage
+
+
+class MsgRegistry:
+    msg_by_pgn: dict[int, (Node, BoundMessage)]
+    nodes: list[Node]
+    _nodes_by_key: dict[str, Node]
+
+    def __init__(self, nodes: list[Node]):
+        self.nodes = nodes
+        self._nodes_by_key = {n.key: n for n in nodes}
+
+        self.msg_by_pgn = {}
+        for node in nodes:
+            for msg_def in node.messages:
+                if msg_def.direction == "rx":
+                    self.msg_by_pgn.setdefault(msg_def.dbc_msg.frame_id, []).append((node, msg_def))
+
+    def decode(self, msg: can.Message):
+        if msg is None:
+            return None
+
+        pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(msg.arbitration_id)
+        msg_def_candidates = self.msg_by_pgn.get(pgn)
+
+        if msg_def_candidates is None:
+            return None
+        else:
+            for node, msg_def in msg_def_candidates:
+                if (node.node_addr is None or msg_dest_addr == 0xFF or msg_dest_addr == node.node_addr) \
+                        and (msg_def.src_addr is None or msg_src_addr == msg_def.src_addr):
+                    return node, msg_def, msg_def.decode(msg_def.dbc_msg.decode(msg.data))
+
+        return None
+
+    def encode(self, target_node_key: str, msg_key: str, msg: dict, src_node_key: str = 'master') -> can.Message:
+        src_node: Node = self._nodes_by_key[src_node_key]
+        target_node: Node = self._nodes_by_key[target_node_key]
+        msg_def: BoundMessage = self._nodes_by_key[target_node_key].message(msg_key)
+        data: bytes = msg_def.dbc_msg.encode(msg_def.encode(msg))
+
+        return can.Message(
+            arbitration_id=pgn_to_can_id(msg_def.dbc_msg.frame_id, msg_def.priority, src_node.node_addr, target_node.node_addr),
+            data=data,
+            is_extended_id=True,
+            dlc=8
+        )
 
 
 def create_motor_cmd_msg(db, on, src_addr, dest_addr=None, priority=None):
@@ -128,8 +175,8 @@ def create_temp_state_msg(db, temp_c, temp_v, node_addr, dest_addr=None, priorit
     )
 
 
-def parse_temp_state_msg(message, db, node_addr=None, assert_src_addr=None):
-    msg = db.get_message_by_name("TEMP_STATE")
+def parse_temp_state_msg(message, db, msg_name, node_addr=None, assert_src_addr=None):
+    msg = db.get_message_by_name(msg_name)
 
     pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(message.arbitration_id)
 
