@@ -1,8 +1,9 @@
 can:
   dbc_file: "conf/messages.dbc"
-  channel: "can0"
-  interface: "socketcan"
-  receive_timeout: 0.001
+  # bus:
+  #   channel: "can0"
+  #   interface: "socketcan"
+  #   receive_timeout: 0.001
   process_interval: 0.001
 message_types:
 - key: "temp_state"
@@ -34,6 +35,8 @@ node_types:
   - key: "temp_state"
     msg_type_ref: "temp_state"
     direction: "rx"
+  node_state_class: "brewbot.can.node_state:ThermometerNodeState"
+  mock_class: "brewbot.can.mock:MockThermometer"
 - key: "relay"
   messages:
   - key: "relay_state"
@@ -42,6 +45,8 @@ node_types:
   - key: "relay_cmd"
     msg_type_ref: "relay_cmd"
     direction: "tx"
+  node_state_class: "brewbot.can.node_state:RelayNodeState"
+  mock_class: "brewbot.can.mock:MockRelay"
 nodes:
 - key: "master"
   name: "MASTER_NODE"

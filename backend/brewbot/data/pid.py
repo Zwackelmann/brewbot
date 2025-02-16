@@ -1,7 +1,8 @@
 import numpy as np
+import pandas as pd
 
 
-def calculate_pd_error(setpoint, df, current_time, time_window):
+def calculate_pd_error(setpoint: float, df: pd.DataFrame, current_time: float, time_window: float) -> (float, float):
     """
     Calculates the proportional (P) and derivative (D) error components for a PID controller.
 
@@ -34,7 +35,7 @@ def calculate_pd_error(setpoint, df, current_time, time_window):
     return p_error, d_error
 
 
-def duty_cycle(cs, max_cs=2.5, low_jump_thres=0.1, high_jump_thres=0.9):
+def duty_cycle(cs: float, max_cs: float=2.5, low_jump_thres: float=0.1, high_jump_thres: float=0.9) -> float:
     # Calculate the duty cycle as a fraction of the max control signal
     pw = min(cs / max_cs, 1.0)
 

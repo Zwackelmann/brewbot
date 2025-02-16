@@ -18,13 +18,16 @@ signal_decoders = {
     "flag": parse_on_off
 }
 
-
-class CanConfig(BaseModel):
-    dbc_file: str
+class CanBusConfig(BaseModel):
     channel: str
     interface: str
     receive_timeout: float
+
+
+class CanConfig(BaseModel):
+    dbc_file: str
     process_interval: float
+    bus: Optional[CanBusConfig] = None
 
 
 class SignalDef(BaseModel):
@@ -77,6 +80,8 @@ class NodeMessage(BaseModel):
 class NodeType(BaseModel):
     key: str
     messages: list[NodeMessage]
+    mock_class: Optional[str] = None
+    node_state_class: Optional[str] = None
 
     def bind(self, msg_types: list[MsgType]):
         for msg in self.messages:
@@ -150,6 +155,8 @@ class Node(BaseModel):
     node_addr: int
     message_bindings: list[NodeMessageBinding]
     debug: dict
+    node_mock_class: Optional[str] = Field(default=None, alias="mock_class")
+    node_node_state_class: Optional[str] = Field(default=None, alias="node_state_class")
 
     # Private attributes to store the computed messages.
     _messages: list[BoundMessage] = PrivateAttr()
@@ -189,6 +196,20 @@ class Node(BaseModel):
             return self._messages_by_key[key]
         except KeyError:
             raise KeyError(f"No message found with key: {key}")
+
+    @property
+    def mock_class(self) -> Optional[str]:
+        if self.node_mock_class is not None:
+            return self.node_mock_class
+        else:
+            return self.node_type.mock_class
+
+    @property
+    def node_state_class(self) -> Optional[str]:
+        if self.node_node_state_class is not None:
+            return self.node_node_state_class
+        else:
+            return self.node_type.node_state_class
 
 
 class TempSignalControllerConfig(BaseModel):

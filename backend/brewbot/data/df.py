@@ -1,8 +1,14 @@
 import pandas as pd
+from typing import Optional
 
 
 class WindowedDataFrame:
-    def __init__(self, window, columns, index_column, init_data=None):
+    window: float
+    columns: list[str]
+    index_column: str
+    df: pd.DataFrame
+
+    def __init__(self, window: float, columns: list[str], index_column: str, init_data: Optional[dict]=None):
         self.window = window
 
         if init_data is None:
@@ -12,7 +18,7 @@ class WindowedDataFrame:
         self.columns = columns
         self.index_column = index_column
 
-    def append(self, data, curr=None):
+    def append(self, data: dict, curr: Optional[float]=None) -> None:
         new_data = pd.DataFrame(data, columns=self.columns).set_index(self.index_column)
 
         dfs = [_df for _df in [self.df, new_data] if len(_df) != 0]
@@ -28,5 +34,5 @@ class WindowedDataFrame:
 
         self._remove_old(curr)
 
-    def _remove_old(self, current_time: float):
+    def _remove_old(self, current_time: float) -> None:
         self.df = self.df.loc[(current_time - self.window):current_time]

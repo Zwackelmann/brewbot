@@ -1,18 +1,15 @@
 import asyncio
 import can
 import time
-import numpy as np
 from fastapi import FastAPI, Query
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from brewbot.data.df import WindowedDataFrame
+from asyncio.tasks import Task
 from brewbot.data.pid import calculate_pd_error, duty_cycle
-from brewbot.can.messages import (create_heat_plate_cmd_msg, parse_heat_plate_state_msg, create_motor_cmd_msg,
-                                  parse_motor_state_msg, parse_temp_state_msg)
-from brewbot.util import parse_on_off, format_on_off, async_infinite_loop
-from brewbot.config import load_config
-from brewbot.can.mock import MockSourceTemp, MockSourceMotor, MockSourceHeatPlate, MockBus
-from can import Message as CanMessage
+from brewbot.util import parse_on_off, async_infinite_loop, load_object, avg_dict
+from brewbot.config import load_config, Config, Node, BoundMessage
+from brewbot.can.msg_registry import MsgRegistry
+from brewbot.can.mock import MockState, MockNode
 
 # sudo ip link set can0 type can bitrate 125000
 # sudo ip link set up can0
@@ -31,25 +28,28 @@ app = FastAPI(lifespan=lifespan)
 app.state = app.state  # for IDE, since accessing `app.state` yielded warnings
 
 
-mock_source_class = {
-    "temp": MockSourceTemp,
-    "motor": MockSourceMotor,
-    "heat_plate": MockSourceHeatPlate
-}
-
-
 @async_infinite_loop
 async def can_recv_loop():
-    can_recv_step()
-    await asyncio.sleep(app.state.conf["can"]["process_interval"])
+    conf: Config = app.state.conf
 
+    if app.state.can_bus is None and conf.can.bus is not None:
+        app.state.can_bus = can.interface.Bus(
+            conf.can.bus.channel,
+            interface=conf.can.bus.interface
+        )
 
-def can_recv_step():
-    for bus in app.state.busses.values():
-        message = bus.recv(timeout=app.state.conf["can"]["receive_timeout"])
+    if app.state.can_bus is not None:
+        can_message = app.state.can_bus.recv(timeout=conf.can.bus.receive_timeout)
 
-        if message is not None:
-            handle_message(message)
+        if can_message is not None:
+            decoded_message = app.state.msg_reg.decode(can_message)
+            if decoded_message is not None:
+                handle_message(*decoded_message)
+
+    if len(app.state.mock_msg_queue) != 0:
+        handle_message(*app.state.mock_msg_queue.pop(0))
+
+    await asyncio.sleep(conf.can.process_interval)
 
 
 def calc_duty_cycle(temp_setpoint):
@@ -67,44 +67,6 @@ def calc_duty_cycle(temp_setpoint):
     high_jump_thres = app.state.conf["control"]["temp"]["high_jump_thres"]
 
     return duty_cycle(cs, max_cs, low_jump_thres, high_jump_thres)
-
-
-def curr_temp():
-    df = app.state.signal_values["temp"]["temp_c"].df
-    window = app.state.conf["signals"]["temp"]["window"]
-    current_time = time.time()
-
-    if len(df) == 0:
-        return float("nan")
-
-    filtered_data = df.loc[(current_time - window):current_time]
-
-    if len(filtered_data) == 0:
-        return float("nan")
-    elif len(filtered_data) == 1:
-        return filtered_data.iloc[0]["y"]
-    else:
-        poly = np.polyfit(filtered_data.index.to_numpy(), filtered_data['y'].to_numpy(), 1)
-        return np.polyval(poly, current_time)
-
-
-def curr_temp_v():
-    df = app.state.signal_values["temp"]["temp_v"].df
-    window = app.state.conf["signals"]["temp"]["window"]
-    current_time = time.time()
-
-    if len(df) == 0:
-        return float("nan")
-
-    filtered_data = df.loc[(current_time - window):current_time]
-
-    if len(filtered_data) == 0:
-        return float("nan")
-    elif len(filtered_data) == 1:
-        return filtered_data.iloc[0]["y"]
-    else:
-        poly = np.polyfit(filtered_data.index.to_numpy(), filtered_data['y'].to_numpy(), 1)
-        return np.polyval(poly, current_time)
 
 
 @async_infinite_loop
@@ -136,136 +98,117 @@ async def control_heat_plate():
         raise ValueError("invalid value for duty cycle")
 
 
-@async_infinite_loop
-async def print_temp():
-    print(f"temp {curr_temp_v():4.3f} V, {curr_temp():4.1f}°C")
-    await asyncio.sleep(1.0)
+def send_message(node_key: str, msg_key: str, msg: dict):
+    conf: Config = app.state.conf
+    node = conf.node(node_key)
+    msg_def = node.message(msg_key)
+
+    if node.debug.get('mock', False):
+        node_mock: MockNode = app.state.mock_nodes[node_key]
+        node_mock.handle_message(msg_def, msg)
+    elif app.state.bus is not None:
+        bus: can.interface.Bus = app.state.bus
+        msg_reg: MsgRegistry = app.state.msg_reg
+        encoded_message = msg_reg.encode(node_key, msg_key, msg)
+        bus.send(encoded_message)
+    else:
+        print(f"target node is not defined as mock and no can bus is defined: {node_key} {msg_key}")
 
 
-def handle_message(message):
-    temp_msg = parse_temp_state_msg(
-        message,
-        app.state.dbc,
-        app.state.conf["can"]["node_addr"],
-        app.state.conf["signals"]["temp"]["node_addr"]
-    )
-    if temp_msg is not None:
-        app.state.signal_values["temp"]["temp_c"].append({"t": [time.time()], "y": [temp_msg['TEMP_C']]})
-        app.state.signal_values["temp"]["temp_v"].append({"t": [time.time()], "y": [temp_msg['TEMP_V']]})
+def handle_message(node: Node, msg_def: BoundMessage, msg: dict):
+    node_state = app.state.node_states.get(node.key)
 
-    motor_state_msg = parse_motor_state_msg(
-        message,
-        app.state.dbc,
-        app.state.conf["can"]["node_addr"],
-        app.state.conf["signals"]["motor"]["node_addr"]
-    )
-    if motor_state_msg is not None:
-        app.state.signal_values["motor"] = {"relay_state": format_on_off(motor_state_msg["RELAY_STATE"])}
-
-    heat_plate_state_msg = parse_heat_plate_state_msg(
-        message,
-        app.state.dbc,
-        app.state.conf["can"]["node_addr"],
-        app.state.conf["signals"]["heat_plate"]["node_addr"]
-    )
-    if heat_plate_state_msg is not None:
-        app.state.signal_values["heat_plate"] = {"relay_state": format_on_off(heat_plate_state_msg["RELAY_STATE"])}
-
-        if "temp" in app.state.debug["mock_sources"]:
-            heating = app.state.signal_values["heat_plate"]["relay_state"] == "on"
-            app.state.debug["mock_sources"]["temp"].heating = heating
+    if node_state is not None:
+        node_state.handle_message(msg_def, msg)
 
 
 async def read_config(_app: FastAPI):
     _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    _app.state.conf = load_config()
-    _app.state.dbc = load_can_database(_app.state.conf["can"]["dbc_file"])
-    _app.state.busses = {}
+    conf = load_config()
+    _app.state.conf = conf
+    _app.state.msg_reg = MsgRegistry(_app.state.conf.nodes)
+    _app.state.can_bus = None
+    _app.state.mock_msg_queue = []
+    _app.state.send_queue = []
     _app.state.tasks = {"can_recv": None, "mock_sources": {}}
 
-    _app.state.signal_names = ["temp", "motor", "heat_plate"]
+    _app.state.node_states = gen_node_states(conf)
+    _app.state.mock_state = MockState(conf, _app.state.node_states)
+    _app.state.mock_nodes = gen_mock_nodes(conf, _app.state.mock_msg_queue, _app.state.mock_state)
 
-    temp_window = _app.state.conf["signals"]["temp"]["window"]
-    num_temp_nodes = len(_app.state.conf["signals"]["temp"]["nodes"])
 
-    _app.state.signal_values = {
-        "temp": [
-            {
-              "temp_c": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t"),
-              "temp_v": WindowedDataFrame(temp_window, columns=["t", "y"], index_column="t")
-            } for _ in range(num_temp_nodes)
-        ],
-        "motor": {"relay_state": None},
-        "heat_plate": {"relay_state": None}
-    }
+def gen_node_states(conf: Config):
+    node_states = {}
+    for node in conf.nodes:
+        if node.node_state_class is not None:
+            node_state_class = load_object(node.node_state_class)
+            node_states[node.key] = node_state_class(conf, node)
 
-    _app.state.setpoint = {
-        "temp": None
-    }
+    return node_states
 
-    _app.state.debug = {"mock_sources": {}}
 
-    for signal_name in _app.state.signal_names:
-        if _app.state.conf["debug"]["mock"][signal_name]:
-            _app.state.debug["mock_sources"][signal_name] = mock_source_class[signal_name](_app.state.dbc)
+def gen_mock_nodes(conf: Config, msg_queue: list[(Node, BoundMessage, dict)], mock_state: MockState) -> dict[str, MockNode]:
+    mock_nodes = {}
+    for node in conf.nodes:
+        if node.debug.get('mock', False):
+            mock_class = load_object(node.mock_class)
+            mock_nodes[node.key] = mock_class(conf, node, msg_queue, mock_state)
 
-    # initiate real can bus, if one signal is not being mocked
-    if any(signal_name not in _app.state.debug["mock_sources"] for signal_name in _app.state.signal_names):
-        _app.state.busses["can"] = can.interface.Bus(
-            _app.state.conf["can"]["channel"],
-            interface=_app.state.conf["can"]["interface"]
-        )
-
-    mock_sources = [mock_source for mock_source in _app.state.debug["mock_sources"].values()]
-    _app.state.busses["mock"] = MockBus(mock_sources)
+    return mock_nodes
 
 
 async def create_background_tasks(_app: FastAPI):
     _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    for signal_name, mock_source in _app.state.debug["mock_sources"].items():
-        _app.state.tasks["mock_sources"][signal_name] = asyncio.create_task(mock_source.queue_messages())
+    for node_key, node_mock in  _app.state.mock_nodes.items():
+        mock_source_task = asyncio.create_task(node_mock.queue_messages())
+        _app.state.tasks["mock_sources"][node_key] = mock_source_task
 
     _app.state.tasks["can_recv"] = asyncio.create_task(can_recv_loop())
-    _app.state.tasks["control_heat_plate"] = asyncio.create_task(control_heat_plate())
-    _app.state.tasks["print_temp"] = asyncio.create_task(print_temp())
+    _app.state.tasks["simulate_mock_state"] = asyncio.create_task(_app.state.mock_state.simulation_task())
+    # _app.state.tasks["control_heat_plate"] = asyncio.create_task(control_heat_plate())
+    # _app.state.tasks["print_temp"] = asyncio.create_task(print_temp())
+
+
+def collect_tasks(obj) -> list[Task]:
+    tasks = []
+    if isinstance(obj, Task):
+        tasks.append(obj)
+    elif isinstance(obj, dict):
+        for item in [_item for _, _item in obj.items()]:
+            tasks.extend(collect_tasks(item))
+    elif isinstance(obj, list):
+        for item in obj:
+            tasks.extend(collect_tasks(item))
+    else:
+        print(f"invalid type in type dict: {type(obj)}")
+
+    return tasks
 
 
 async def cancel_background_tasks(_app: FastAPI):
     _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
 
-    tasks = [_app.state.tasks.get("can_recv"),
-             _app.state.tasks.get("control_heat_plate"),
-             _app.state.tasks.get("print_temp")]
-
-    tasks.extend(_app.state.tasks["mock_sources"].values())
-
-    tasks = [_t for _t in tasks if _t is not None]
-
-    for task in tasks:
+    for task in collect_tasks(app.state.tasks):
         task.cancel()
         await task
 
 
 @app.get("/temp")
 async def get_temp():
+    nodes = app.state.msg_reg.nodes_by_type("thermometer")
+    states = [app.state.node_states[node.key].state() for node in nodes]
+
     return {
         "action": "get_temp",
         "status": "success",
-        "data": {
-            "temp_c": float(app.state.signal_values["temp"]["temp_c"].df['y'].median()),
-            "temp_v": float(app.state.signal_values["temp"]["temp_v"].df['y'].median())
-        }
+        "data": avg_dict(states)
     }
 
 
 def set_motor(on_off):
-    if not app.state.conf["debug"]["mock"]["motor"]:
-        msg = create_motor_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
-        app.state.busses["can"].send(msg)
-    else:
-        app.state.debug["mock_sources"]["motor"].set_relay(on_off)
+    send_message('motor_1', 'relay_cmd', {'on': on_off})
 
 
 @app.get("/motor/{on_off}")
@@ -289,22 +232,16 @@ async def set_motor_route(on_off):
 
 @app.get("/motor")
 async def get_motor_state():
+    node_state = app.state.node_states['motor_1']
     return {
         "action": "get_motor",
         "status": "success",
-        "data": app.state.signal_values["motor"]
+        "data": node_state.state()
     }
 
 
 def set_heat_plate(on_off):
-    on_off = parse_on_off(on_off)
-
-    if not app.state.conf["debug"]["mock"]["heat_plate"]:
-        # print(f"heat plate: {format_on_off(on_off)}")
-        msg = create_heat_plate_cmd_msg(app.state.dbc, on_off, app.state.conf["can"]["node_addr"])
-        app.state.busses["can"].send(msg)
-    else:
-        app.state.debug["mock_sources"]["heat_plate"].set_relay(on_off)
+    send_message('heat_plate_1', 'relay_cmd', {'on': on_off})
 
 
 @app.get("/heat_plate/{on_off}")
@@ -328,10 +265,12 @@ async def set_heat_plate_route(on_off):
 
 @app.get("/heat_plate")
 async def get_heat_plate_state():
+    node_state = app.state.node_states['heat_plate_1']
+
     return {
         "action": "get_heat_plate",
         "status": "success",
-        "data": app.state.signal_values["heat_plate"]
+        "data": node_state.state()
     }
 
 

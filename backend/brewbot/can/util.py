@@ -1,16 +1,16 @@
-def pdu_format(pgn):
+def pdu_format(pgn: int) -> int:
     return (pgn >> 8) & 0xFF
 
 
-def is_pdu_format_1(pgn):
+def is_pdu_format_1(pgn: int) -> bool:
     return pdu_format(pgn) < 0xF0
 
 
-def is_pdu_format_2(pgn):
+def is_pdu_format_2(pgn: int) -> bool:
     return pdu_format(pgn) >= 0xF0
 
 
-def pgn_to_can_id(pgn, priority, src_addr, dest_addr):
+def pgn_to_can_id(pgn: int, priority: int, src_addr: int, dest_addr: int) -> int:
     pgn_encoded = pgn
     if is_pdu_format_1(pgn):
         pgn_encoded |= (dest_addr & 0xFF)
@@ -29,7 +29,7 @@ def pgn_to_can_id(pgn, priority, src_addr, dest_addr):
     return can_id
 
 
-def can_id_to_pgn(can_id):
+def can_id_to_pgn(can_id: int) -> (int, int, int, int):
     src_addr = can_id & 0xFF
     ps = (can_id >> 8) & 0xFF
     pf = (can_id >> 16) & 0xFF
