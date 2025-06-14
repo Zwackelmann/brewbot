@@ -30,6 +30,7 @@ message_types:
 node_types:
 - key: "master"
   messages: []
+  node_state_class: "brewbot.can.node_state:MasterNodeState"
 - key: "thermometer"
   messages:
   - key: "temp_state"
@@ -45,6 +46,7 @@ node_types:
   - key: "relay_cmd"
     msg_type_ref: "relay_cmd"
     direction: "tx"
+    frequency: 0.5 # msg / s
   node_state_class: "brewbot.can.node_state:RelayNodeState"
   mock_class: "brewbot.can.mock:MockRelay"
 nodes:
@@ -94,6 +96,20 @@ nodes:
     dbc_msg: "HEAT_PLATE_CMD_1"
   debug:
     mock: true
+assembly_types:
+- key: "kettle"
+  assembly_class: "brewbot.assembly.kettle:KettleAssembly"
+assemblies:
+- key: "kettle_1"
+  assembly_type_ref: "kettle"
+  nodes:
+    thermometer:
+    - "thermometer_1"
+    - "thermometer_2"
+    motor: "motor_1"
+    heat_plate: "heat_plate_1"
+  params:
+    volume: 30.0  # l
 signals:
   temp:
     window: 10.0

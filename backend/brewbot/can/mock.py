@@ -1,7 +1,9 @@
 import asyncio
-from brewbot.config import Config, Node, BoundMessage
+from brewbot.util import load_object
+from brewbot.config import Config, NodeConfig, BoundMessage
+from brewbot.can.node_state import NodeState
 import random
-from typing import Protocol
+from typing import Protocol, Tuple
 
 
 class MockNode(Protocol):
@@ -14,8 +16,8 @@ class MockNode(Protocol):
 
 class MockThermometer(MockNode):
     conf: Config
-    node: Node
-    msg_queue: list[(Node, BoundMessage, dict)]
+    node_conf: NodeConfig
+    msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
     mock_state: "MockState"
     msg_interval: float
 
@@ -25,9 +27,9 @@ class MockThermometer(MockNode):
     v_to_temp_m: float
     v_to_temp_b: float
 
-    def __init__(self, conf: Config, node: Node, msg_queue: list[(Node, BoundMessage, dict)], mock_state: "MockState"):
+    def __init__(self, conf: Config, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
         self.conf = conf
-        self.node = node
+        self.node_conf = node_conf
         self.msg_queue = msg_queue
         self.mock_state = mock_state
         self.msg_interval = 0.1
@@ -50,9 +52,9 @@ class MockThermometer(MockNode):
                 temp_c = self.mock_state.temp + self.measure_error()
                 temp_v = (temp_c - self.v_to_temp_b) / self.v_to_temp_m
 
-                msg_def = self.node.message('temp_state')
+                msg_def = self.node_conf.message('temp_state')
                 msg = {'temp_v': temp_v, 'temp_c': temp_c}
-                self.msg_queue.append((self.node, msg_def, msg))
+                self.msg_queue.append((self.node_conf, msg_def, msg))
 
                 await asyncio.sleep(self.msg_interval)
             except asyncio.CancelledError:
@@ -61,15 +63,15 @@ class MockThermometer(MockNode):
 
 class MockRelay(MockNode):
     conf: Config
-    node: Node
-    msg_queue: list[(Node, BoundMessage, dict)]
+    node_conf: NodeConfig
+    msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
     mock_state: "MockState"
     msg_interval: float
     relay_state: dict
 
-    def __init__(self, conf: Config, node: Node, msg_queue: list[(Node, BoundMessage, dict)], mock_state: "MockState"):
+    def __init__(self, conf: Config, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
         self.conf = conf
-        self.node = node
+        self.node_conf = node_conf
         self.msg_queue = msg_queue
         self.mock_state = mock_state
         self.msg_interval = 0.1
@@ -85,15 +87,15 @@ class MockRelay(MockNode):
     async def queue_messages_task(self):
         while True:
             try:
-                msg_def = self.node.message('relay_state')
-                self.msg_queue.append((self.node, msg_def, self.relay_state))
+                msg_def = self.node_conf.message('relay_state')
+                self.msg_queue.append((self.node_conf, msg_def, self.relay_state))
                 await asyncio.sleep(self.msg_interval)
             except asyncio.CancelledError:
                 break
 
 
 class MockState:
-    def __init__(self, conf: Config, node_states: dict):
+    def __init__(self, conf: Config, node_states: dict[str, NodeState]):
         self.temp = 20.0
         self.effective_power = 0.0
         self.p_on = 5000   # power heat plate is on (W)
@@ -110,8 +112,9 @@ class MockState:
 
     def simulate(self, dt: float) -> None:
         heat_plate_state = self.node_states['heat_plate_1']
-        heating = heat_plate_state.state().get('on', False)
 
+        relay_state = heat_plate_state.rx_message_state.get('relay_state')
+        heating = relay_state.get('on', False) if relay_state is not None else False
         target_power = self.p_on if heating else 0.0
         self.effective_power += (target_power - self.effective_power) * dt / self.tau
 
@@ -126,3 +129,13 @@ class MockState:
                 await asyncio.sleep(self.simulation_interval)
             except asyncio.CancelledError:
                 break
+
+
+def gen_mock_nodes(conf: Config, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: MockState) -> dict[str, MockNode]:
+    mock_nodes = {}
+    for node in conf.nodes:
+        if node.debug.get('mock', False):
+            mock_class = load_object(node.mock_class)
+            mock_nodes[node.key] = mock_class(conf, node, msg_queue, mock_state)
+
+    return mock_nodes

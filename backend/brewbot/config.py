@@ -30,7 +30,7 @@ class CanConfig(BaseModel):
     bus: Optional[CanBusConfig] = None
 
 
-class SignalDef(BaseModel):
+class SignalDefConfig(BaseModel):
     key: str
     signal_name: str
     tpe_name: str = Field(alias="tpe")
@@ -44,10 +44,10 @@ class SignalDef(BaseModel):
         return signal_decoders[self.tpe_name]
 
 
-class MsgType(BaseModel):
+class MsgTypeConfig(BaseModel):
     key: str
     priority: int
-    signals: list[SignalDef]
+    signals: list[SignalDefConfig]
 
     def encode(self, d):
         return {s.signal_name: s.encode_signal(d[s.key]) for s in self.signals}
@@ -62,28 +62,29 @@ def check_node_message_direction(direction: str) -> str:
     return direction
 
 
-class NodeMessage(BaseModel):
+class NodeMessageConfig(BaseModel):
     key: str
     msg_type_ref: str
     direction: Annotated[str, BeforeValidator(check_node_message_direction)]
+    frequency: Optional[float] = None
 
-    _msg_types_by_name: dict[str, MsgType] = PrivateAttr()
+    _msg_types_by_name: dict[str, MsgTypeConfig] = PrivateAttr()
 
     @property
-    def msg_type(self) -> MsgType:
+    def msg_type(self) -> MsgTypeConfig:
         return self._msg_types_by_name[self.msg_type_ref]
 
-    def bind(self, msg_types: list[MsgType]):
+    def bind(self, msg_types: list[MsgTypeConfig]):
         self._msg_types_by_name = {t.key: t for t in msg_types}
 
 
-class NodeType(BaseModel):
+class NodeTypeConfig(BaseModel):
     key: str
-    messages: list[NodeMessage]
+    messages: list[NodeMessageConfig]
     mock_class: Optional[str] = None
     node_state_class: Optional[str] = None
 
-    def bind(self, msg_types: list[MsgType]):
+    def bind(self, msg_types: list[MsgTypeConfig]):
         for msg in self.messages:
             msg.bind(msg_types)
 
@@ -95,11 +96,11 @@ class NodeMessageBinding(BaseModel):
 
 
 class BoundMessage:
-    node_message: NodeMessage
+    node_message: NodeMessageConfig
     node_message_binding: NodeMessageBinding
     dbc: Database
 
-    def __init__(self, node_message: NodeMessage, node_message_binding: NodeMessageBinding, dbc: Database):
+    def __init__(self, node_message: NodeMessageConfig, node_message_binding: NodeMessageBinding, dbc: Database):
         self.node_message = node_message
         self.node_message_binding = node_message_binding
         self.dbc = dbc
@@ -116,11 +117,15 @@ class BoundMessage:
         return self.node_message.direction
 
     @property
+    def frequency(self) -> Optional[float]:
+        return self.node_message.frequency
+
+    @property
     def dbc_msg(self) -> Message:
         return self.dbc.get_message_by_name(self.node_message_binding.dbc_msg)
 
     @property
-    def signals(self) -> list[SignalDef]:
+    def signals(self) -> list[SignalDefConfig]:
         return self.node_message.msg_type.signals
 
     @property
@@ -148,7 +153,11 @@ class BoundMessage:
             f")"
         )
 
-class Node(BaseModel):
+    def __str__(self):
+        return repr(self)
+
+
+class NodeConfig(BaseModel):
     key: str
     name: str
     node_type_ref: str
@@ -161,9 +170,9 @@ class Node(BaseModel):
     # Private attributes to store the computed messages.
     _messages: list[BoundMessage] = PrivateAttr()
     _messages_by_key: dict[str, BoundMessage] = PrivateAttr()
-    _node_types_by_key: dict[str: NodeType] = PrivateAttr()
+    _node_types_by_key: dict[str, NodeTypeConfig] = PrivateAttr()
 
-    def bind(self, node_types: list[NodeType], dbc: Database):
+    def bind(self, node_types: list[NodeTypeConfig], dbc: Database):
         self._node_types_by_key = {n.key: n for n in node_types}
 
         messages = []
@@ -184,7 +193,7 @@ class Node(BaseModel):
         self._messages_by_key = messages_by_key
 
     @property
-    def node_type(self) -> NodeType:
+    def node_type(self) -> NodeTypeConfig:
         return self._node_types_by_key[self.node_type_ref]
 
     @property
@@ -212,6 +221,68 @@ class Node(BaseModel):
             return self.node_type.node_state_class
 
 
+class AssemblyTypeConfig(BaseModel):
+    key: str
+    assembly_class: str
+
+
+class AssemblyConfig(BaseModel):
+    key: str
+    assembly_type_ref: str
+    nodes_dict: Optional[dict] = Field(default=None, alias="nodes")
+    params: dict
+
+    # Private attributes to store the computed messages.
+    _node_by_key: dict[str, NodeConfig] = PrivateAttr(default=None)
+    _nodes: dict = PrivateAttr(default=None)
+    _assembly_type_by_key: dict[str, AssemblyTypeConfig] = PrivateAttr(default=None)
+
+    def bind(self, assembly_types: list[AssemblyTypeConfig], nodes: list[NodeConfig]):
+        self._assembly_type_by_key = {at.key: at for at in assembly_types}
+        self._node_by_key = {n.key: n for n in nodes}
+
+    def resolve_node_refs(self, o):
+        if isinstance(o, str):
+            if o in self._node_by_key:
+                return self._node_by_key[o]
+            else:
+                raise ValueError(f"node reference for assembly not found: {o}")
+        elif isinstance(o, list):
+            return [self.resolve_node_refs(i) for i in o]
+        elif isinstance(o, dict):
+            return {k: self.resolve_node_refs(v) for k, v in o.items()}
+        else:
+            raise ValueError(f"unexpected type in nodes dict: {type(o)}")
+
+    @property
+    def nodes(self):
+        if self._nodes is None:
+            self._nodes = self.resolve_node_refs(self.nodes_dict)
+
+        return self._nodes
+
+    @property
+    def assembly_type(self):
+        return self._assembly_type_by_key[self.assembly_type_ref]
+
+    @property
+    def assembly_class(self):
+        return self.assembly_type.assembly_class
+
+    def __repr__(self):
+        return (
+            f"AssemblyConfig("
+            f"key={self.key!r}, "
+            f"assembly_type={self.assembly_type!r}, "
+            f"nodes={self.nodes!r}, "
+            f"params={self.params!r}"
+            f")"
+        )
+
+    def __str__(self):
+        return repr(self)
+
+
 class TempSignalControllerConfig(BaseModel):
     p_gain: float
     d_gain: float
@@ -234,14 +305,18 @@ class Config:
     conf_dict: dict
     can: CanConfig
     dbc: Database
-    message_types: list[MsgType]
-    node_types: list[NodeType]
-    nodes: list[Node]
+    message_types: list[MsgTypeConfig]
+    node_types: list[NodeTypeConfig]
+    nodes: list[NodeConfig]
+    assembly_types: list[AssemblyTypeConfig]
+    assemblies: list[AssemblyConfig]
     signals: SignalConfig
 
-    _message_types_by_key: dict[str, MsgType]
-    _node_types_by_key: dict[str, NodeType]
-    _nodes_by_key: dict[str, Node]
+    _message_types_by_key: dict[str, MsgTypeConfig]
+    _node_types_by_key: dict[str, NodeTypeConfig]
+    _nodes_by_key: dict[str, NodeConfig]
+    _assembly_type_by_key: dict[str, AssemblyTypeConfig]
+    _assembly_by_key: dict[str, AssemblyConfig]
 
     def __init__(self, conf_dict):
         self.conf_dict = conf_dict
@@ -251,14 +326,14 @@ class Config:
         self.message_types = []
         self._message_types_by_key = {}
         for mt_conf in conf_dict['message_types']:
-            msg_type = MsgType(**mt_conf)
+            msg_type = MsgTypeConfig(**mt_conf)
             self.message_types.append(msg_type)
             self._message_types_by_key[msg_type.key] = msg_type
 
         self.node_types = []
         self._node_types_by_key = {}
         for node_type_conf in conf_dict['node_types']:
-            node_type = NodeType(**node_type_conf)
+            node_type = NodeTypeConfig(**node_type_conf)
             node_type.bind(self.message_types)
             self.node_types.append(node_type)
             self._node_types_by_key[node_type.key] = node_type
@@ -266,12 +341,28 @@ class Config:
         self.nodes = []
         self._nodes_by_key = {}
         for node_conf in conf_dict['nodes']:
-            node = Node(**node_conf)
+            node = NodeConfig(**node_conf)
             node.bind(self.node_types, self.dbc)
             self.nodes.append(node)
             self._nodes_by_key[node.key] = node
 
+        self.assembly_types = []
+        self._assembly_type_by_key = {}
+        for at_conf in conf_dict['assembly_types']:
+            at = AssemblyTypeConfig(**at_conf)
+            self.assembly_types.append(at)
+            self._assembly_type_by_key[at.key] = at
+
+        self.assemblies = []
+        self._assembly_by_key = {}
+        for assembly_conf in conf_dict['assemblies']:
+            assembly = AssemblyConfig(**assembly_conf)
+            assembly.bind(self.assembly_types, self.nodes)
+            self.assemblies.append(assembly)
+            self._assembly_by_key[assembly.key] = assembly
+
         self.signals = SignalConfig(**conf_dict['signals'])
+
 
     def message_type(self, key):
         return self._message_types_by_key[key]
@@ -281,6 +372,9 @@ class Config:
 
     def node(self, key):
         return self._nodes_by_key[key]
+
+    def assembly(self, key):
+        return self._assembly_by_key[key]
 
 
 def load_config_dict(path=CONFIG_PATH):
