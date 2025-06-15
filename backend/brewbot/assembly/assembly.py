@@ -1,6 +1,6 @@
 from brewbot.config import AssemblyConfig, Config
 from brewbot.util import load_object
-from typing import Protocol
+from typing import Protocol, Coroutine
 from brewbot.can.node_state import NodeState
 
 def from_config(conf: AssemblyConfig):
@@ -9,6 +9,9 @@ def from_config(conf: AssemblyConfig):
 
 class Assembly(Protocol):
     name: str
+
+    def background_tasks(self) -> list[Coroutine]:
+        ...
 
 def gen_assemblies(conf: Config, node_states: dict[str, NodeState]) -> dict[str, Assembly]:
     assemblies = {}

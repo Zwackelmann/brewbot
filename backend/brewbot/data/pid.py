@@ -39,6 +39,8 @@ def duty_cycle(cs: float, max_cs: float=2.5, low_jump_thres: float=0.1, high_jum
     # Calculate the duty cycle as a fraction of the max control signal
     pw = min(cs / max_cs, 1.0)
 
+    if np.isnan(pw):
+        return pw
     if pw < low_jump_thres / 2:
         return 0.0  # Force relay completely off for very low control signals
     elif low_jump_thres / 2 <= pw < low_jump_thres:

@@ -2,16 +2,45 @@ import asyncio
 import importlib
 import numpy as np
 from typing import Any
+import functools
+import inspect
 
 
 def async_infinite_loop(fun):
-    async def _coroutine():
-        while True:
-            try:
-                await fun()
-            except asyncio.CancelledError:
-                break
-    return _coroutine
+    sig = inspect.signature(fun)
+    params = list(sig.parameters.values())
+    is_method = params and params[0].kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.POSITIONAL_ONLY)
+
+    if is_method:
+        @functools.wraps(fun)
+        async def _coroutine(self, *args, **kwargs):
+            while True:
+                try:
+                    await fun(self, *args, **kwargs)
+                except asyncio.CancelledError:
+                    break
+        return _coroutine
+    else:
+        @functools.wraps(fun)
+        async def _coroutine(*args, **kwargs):
+            while True:
+                try:
+                    await fun(*args, **kwargs)
+                except asyncio.CancelledError:
+                    break
+        return _coroutine
+
+
+def log_exceptions(task: asyncio.Task, name: str = ""):
+    def callback(t):
+        try:
+            t.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print(f"[ERROR] Task {name} crashed: {e}")
+    task.add_done_callback(callback)
+    return task
 
 
 def parse_on_off(on_off: Any) -> bool:
@@ -100,4 +129,4 @@ def avg_dict(dict_list: list[dict[str, float]]) -> dict[str, float]:
             res.setdefault(key, []).append(val)
 
     res = {k: [v for v in vs if v is not None and not np.isnan(v)] for k, vs in res.items()}
-    return {k: float(np.mean(vs)) for k, vs in res.items()}
+    return {k: float(np.mean(vs)) if len(vs) != 0 else None for k, vs in res.items()}

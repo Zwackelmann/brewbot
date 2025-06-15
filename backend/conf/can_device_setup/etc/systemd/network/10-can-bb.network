@@ -1,0 +1,8 @@
+[Match]
+Name=can-bb
+
+[CAN]
+BitRate=125000
+
+[Link]
+RequiredForOnline=no

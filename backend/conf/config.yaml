@@ -1,9 +1,9 @@
 can:
   dbc_file: "conf/messages.dbc"
-  # bus:
-  #   channel: "can0"
-  #   interface: "socketcan"
-  #   receive_timeout: 0.001
+  bus:
+    channel: "can-bb"
+    interface: "socketcan"
+    receive_timeout: 0.001
   process_interval: 0.001
 message_types:
 - key: "temp_state"
@@ -63,17 +63,21 @@ nodes:
   message_bindings:
   - ref_key: "temp_state"
     dbc_msg: "TEMP_STATE_1"
+  params:
+    window: 10.0 # s
   debug:
-    mock: true
-- key: "thermometer_2"
-  name: "TEMP_NODE_2"
-  node_type_ref: "thermometer"
-  node_addr: 113 # 0x71
-  message_bindings:
-  - ref_key: "temp_state"
-    dbc_msg: "TEMP_STATE_2"
-  debug:
-    mock: true
+    mock: false
+# - key: "thermometer_2"
+#   name: "TEMP_NODE_2"
+#   node_type_ref: "thermometer"
+#   node_addr: 113 # 0x71
+#   message_bindings:
+#   - ref_key: "temp_state"
+#     dbc_msg: "TEMP_STATE_2"
+#   params:
+#     window: 10.0 # s
+#   debug:
+#     mock: false
 - key: "motor_1"
   name: "MOTOR_NODE_1"
   node_type_ref: "relay"
@@ -95,7 +99,7 @@ nodes:
   - ref_key: "relay_cmd"
     dbc_msg: "HEAT_PLATE_CMD_1"
   debug:
-    mock: true
+    mock: false
 assembly_types:
 - key: "kettle"
   assembly_class: "brewbot.assembly.kettle:KettleAssembly"
@@ -105,18 +109,23 @@ assemblies:
   nodes:
     thermometer:
     - "thermometer_1"
-    - "thermometer_2"
+    # - "thermometer_2"
     motor: "motor_1"
     heat_plate: "heat_plate_1"
   params:
-    volume: 30.0  # l
-signals:
-  temp:
-    window: 10.0
-    controller:
-      p_gain: 0.5
-      d_gain: 5.0
-      max_cs: 7.0
-      pwm_interval: 5.0
-      low_jump_thres: 0.2
-      high_jump_thres: 0.8
+    - name: volume
+      value: 30.0 # l
+    - name: controller
+      config_class: "brewbot.config:ControllerConfig"
+      value:
+        p_gain: 1.0
+        d_gain: 50.0
+        max_cs: 3.5
+        pwm_interval: 0.2  # times per second
+        low_jump_thres: 0.2
+        high_jump_thres: 0.8
+    - name: data_collect
+      config_class: "brewbot.config:DataCollectConfig"
+      value:
+        window: 30.0
+        collect_interval: 2.0 # times per second

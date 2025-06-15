@@ -1,9 +1,9 @@
-from typing import Optional
+from typing import Optional, Any
 
 import yaml
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field, BeforeValidator, PrivateAttr
-from brewbot.util import encode_on_off, parse_on_off
+from brewbot.util import encode_on_off, parse_on_off, load_object
 from cantools.database import Database, load_file as load_dbc_file, Message
 
 CONFIG_PATH = 'conf/config.yaml'
@@ -163,6 +163,7 @@ class NodeConfig(BaseModel):
     node_type_ref: str
     node_addr: int
     message_bindings: list[NodeMessageBinding]
+    params: Optional[dict] = Field(default_factory=lambda: {})
     debug: dict
     node_mock_class: Optional[str] = Field(default=None, alias="mock_class")
     node_node_state_class: Optional[str] = Field(default=None, alias="node_state_class")
@@ -226,11 +227,17 @@ class AssemblyTypeConfig(BaseModel):
     assembly_class: str
 
 
+class ParamConfig(BaseModel):
+    name: str
+    config_class: Optional[str] = Field(default=None)
+    value: Any
+
+
 class AssemblyConfig(BaseModel):
     key: str
     assembly_type_ref: str
     nodes_dict: Optional[dict] = Field(default=None, alias="nodes")
-    params: dict
+    params: list[ParamConfig] = Field(default_factory=lambda: [])
 
     # Private attributes to store the computed messages.
     _node_by_key: dict[str, NodeConfig] = PrivateAttr(default=None)
@@ -269,6 +276,22 @@ class AssemblyConfig(BaseModel):
     def assembly_class(self):
         return self.assembly_type.assembly_class
 
+    @property
+    def parsed_param(self):
+        d = {}
+        for param in self.params:
+            if param.config_class is not None:
+                if not isinstance(param.value, dict):
+                    raise ValueError("param value must be dict when `config_class` is set")
+                cls = load_object(param.config_class)
+                value = cls(**param.value)
+            else:
+                value = param.value
+
+            d[param.name] = value
+
+        return d
+
     def __repr__(self):
         return (
             f"AssemblyConfig("
@@ -283,7 +306,7 @@ class AssemblyConfig(BaseModel):
         return repr(self)
 
 
-class TempSignalControllerConfig(BaseModel):
+class ControllerConfig(BaseModel):
     p_gain: float
     d_gain: float
     max_cs: float
@@ -292,13 +315,18 @@ class TempSignalControllerConfig(BaseModel):
     high_jump_thres: float
 
 
-class TempSignalConfig(BaseModel):
+class DataCollectConfig(BaseModel):
     window: float
-    controller: TempSignalControllerConfig
+    collect_interval: float
 
 
-class SignalConfig(BaseModel):
-    temp: TempSignalConfig
+class TempSignalControllerConfig(BaseModel):
+    p_gain: float
+    d_gain: float
+    max_cs: float
+    pwm_interval: float
+    low_jump_thres: float
+    high_jump_thres: float
 
 
 class Config:
@@ -310,7 +338,6 @@ class Config:
     nodes: list[NodeConfig]
     assembly_types: list[AssemblyTypeConfig]
     assemblies: list[AssemblyConfig]
-    signals: SignalConfig
 
     _message_types_by_key: dict[str, MsgTypeConfig]
     _node_types_by_key: dict[str, NodeTypeConfig]
@@ -360,8 +387,6 @@ class Config:
             assembly.bind(self.assembly_types, self.nodes)
             self.assemblies.append(assembly)
             self._assembly_by_key[assembly.key] = assembly
-
-        self.signals = SignalConfig(**conf_dict['signals'])
 
 
     def message_type(self, key):

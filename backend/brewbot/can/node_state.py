@@ -62,6 +62,14 @@ class NodeState:
         ...
 
 
+class MasterNodeState(NodeState):
+    conf: Config
+    node_conf: NodeConfig
+
+    def __init__(self, conf: Config, node_conf: NodeConfig):
+        super().__init__(conf, node_conf)
+
+
 class ThermometerNodeState(NodeState):
     conf: Config
     node_conf: NodeConfig
@@ -71,7 +79,7 @@ class ThermometerNodeState(NodeState):
 
     def __init__(self, conf: Config, node_conf: NodeConfig):
         super().__init__(conf, node_conf)
-        self.window = conf.signals.temp.window
+        self.window = node_conf.params['window']
         self.temp_c_frame = WindowedDataFrame(self.window, columns=["t", "y"], index_column="t")
         self.temp_v_frame = WindowedDataFrame(self.window, columns=["t", "y"], index_column="t")
         self.register_rx_message_handler("temp_state", self.temp_msg_update)
@@ -81,8 +89,15 @@ class ThermometerNodeState(NodeState):
         self.temp_v_frame.append({"t": [time.time()], "y": [msg['temp_v']]})
 
     def temp_state(self) -> dict:
-        temp_c = ThermometerNodeState.interp(self.temp_c_frame.df, time.time(), self.window)
-        temp_v = ThermometerNodeState.interp(self.temp_v_frame.df, time.time(), self.window)
+        if len(self.temp_c_frame.df) != 0:
+            temp_c = ThermometerNodeState.interp(self.temp_c_frame.df, time.time(), self.window)
+        else:
+            temp_c = None
+
+        if len(self.temp_v_frame.df) != 0:
+            temp_v = ThermometerNodeState.interp(self.temp_v_frame.df, time.time(), self.window)
+        else:
+            temp_v = None
 
         return {
             "temp_c": temp_c,
@@ -119,16 +134,6 @@ class RelayNodeState(NodeState):
             return {'on': format_on_off(self.cmd_state)}
         else:
             raise ValueError("Invalid message")
-
-
-class MasterNodeState(NodeState):
-    conf: Config
-    node_conf: NodeConfig
-    heat_plate_setpoint: Optional[float]
-
-    def __init__(self, conf: Config, node_conf: NodeConfig):
-        super().__init__(conf, node_conf)
-        self.heat_plate_setpoint = None
 
 
 def gen_node_states(conf: Config) -> dict[str, NodeState]:

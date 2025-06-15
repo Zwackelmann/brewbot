@@ -4,9 +4,8 @@ from fastapi import FastAPI, Query
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 from asyncio.tasks import Task
-
 from brewbot.assembly.kettle import KettleAssembly
-from brewbot.util import async_infinite_loop
+from brewbot.util import async_infinite_loop, log_exceptions
 from brewbot.config import load_config, Config, NodeConfig, BoundMessage
 from brewbot.can.msg_registry import MsgRegistry
 from brewbot.assembly.assembly import Assembly, gen_assemblies
@@ -14,11 +13,16 @@ from brewbot.can.mock import MockState, MockNode, gen_mock_nodes
 from brewbot.can.node_state import NodeState, gen_node_states
 from typing import Optional, Tuple
 from dataclasses import dataclass, field
+import logging
 
 
 # sudo ip link set can0 type can bitrate 125000
 # sudo ip link set up can0
 # uvicorn brewbot.rest.api:app --reload
+
+
+logger = logging.getLogger("brewbot.rest.api")
+logger.setLevel(logging.INFO)
 
 
 @asynccontextmanager
@@ -97,7 +101,7 @@ def send_message(node: NodeConfig, msg_def: BoundMessage, msg: dict) -> None:
         encoded_message = msg_reg.encode(node.key, msg_def.key, msg)
         bus.send(encoded_message)
     else:
-        print(f"target node is not defined as mock and no can bus is defined: {node.key} {msg_def.key}")
+        logger.error(f"target node is not defined as mock and no can bus is defined: {node.key} {msg_def.key}")
 
 
 def handle_message(node: NodeConfig, msg_def: BoundMessage, msg: dict) -> None:
@@ -112,8 +116,6 @@ async def init_app_state(_app: FastAPI):
 
     app_state.conf = load_config()
     app_state.msg_reg = MsgRegistry(app_state.conf.nodes)
-    app_state.tasks["mock_sources"] = {}
-    app_state.tasks["queue_tasks"] = {}
 
     app_state.node_states = gen_node_states(app_state.conf)
     app_state.mock_state = MockState(app_state.conf, app_state.node_states)
@@ -123,24 +125,22 @@ async def init_app_state(_app: FastAPI):
     _app.state = app_state
 
 
-
 async def create_background_tasks(_app: FastAPI):
     _app.state = _app.state  # for IDE, since accessing `app.state` yielded warnings
     app_state: AppState = _app.state
 
+    app_state.tasks["mock_sources"] = {}
     for node_key, node_mock in  app_state.mock_nodes.items():
-        mock_source_task = asyncio.create_task(node_mock.queue_messages_task())
-        app_state.tasks["mock_sources"][node_key] = mock_source_task
+        app_state.tasks["mock_sources"][node_key] = log_exceptions(asyncio.create_task(node_mock.queue_messages_task()), f"mock_sources.{node_key}")
 
+    app_state.tasks["queue_tasks"] = {}
     for node_key, node_state in app_state.node_states.items():
-        for task in node_state.queue_tasks(app_state.send_queue):
-            app_state.tasks["queue_tasks"].setdefault(node_key, []).append(asyncio.create_task(task()))
+        app_state.tasks["queue_tasks"][node_key] = [log_exceptions(asyncio.create_task(task()), f"queue_tasks.node_key[{i}]") for i, task in enumerate(node_state.queue_tasks(app_state.send_queue))]
 
-    app_state.tasks["can_recv"] = asyncio.create_task(can_recv_loop_task(app_state)())
-    app_state.tasks["simulate_mock_state"] = asyncio.create_task(app_state.mock_state.simulation_task())
-    app_state.tasks["process_send_queue"] = asyncio.create_task(process_send_queue_task(app_state.send_queue, app_state.conf.can.process_interval)())
-    # _app.state.tasks["control_heat_plate"] = asyncio.create_task(control_heat_plate())
-    # _app.state.tasks["print_temp"] = asyncio.create_task(print_temp())
+    app_state.tasks["can_recv"] = log_exceptions(asyncio.create_task(can_recv_loop_task(app_state)()), "can_recv")
+    app_state.tasks["simulate_mock_state"] = log_exceptions(asyncio.create_task(app_state.mock_state.simulation_task()), "simulate_mock_state")
+    app_state.tasks["process_send_queue"] = log_exceptions(asyncio.create_task(process_send_queue_task(app_state.send_queue, app_state.conf.can.process_interval)()), "process_send_queue")
+    app_state.tasks["assemblies"] = {key: [log_exceptions(asyncio.create_task(coro), f"assemblies.{key}[{i}]") for i, coro in enumerate(assembly.background_tasks())] for key, assembly in app_state.assemblies.items()}
 
 
 def collect_tasks(obj) -> list[Task]:
@@ -154,7 +154,7 @@ def collect_tasks(obj) -> list[Task]:
         for item in obj:
             tasks.extend(collect_tasks(item))
     else:
-        print(f"invalid type in type dict: {type(obj)}")
+        logger.error(f"invalid type in type dict: {type(obj)}")
 
     return tasks
 
@@ -169,26 +169,26 @@ async def cancel_background_tasks(_app: FastAPI):
 
 
 @app.get("/kettle/{kettle_name}/temp")
-async def get_temp_route(kettle_name):
+async def get_temp_state_route(kettle_name):
     app_state: AppState = app.state
     kettle = app_state.assemblies.get(kettle_name)
     if kettle is None:
         return JSONResponse(status_code=400, content={
-            "action": "get_temp",
+            "action": "get_temp_state",
             "status": "error",
             "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
-            "action": "get_temp",
+            "action": "get_temp_state",
             "status": "error",
             "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
         })
     else:
         return JSONResponse(status_code=200, content={
-            "action": "get_temp",
+            "action": "get_temp_state",
             "status": "success",
-            "data": kettle.temp_state()
+            "data": kettle.temp_state
         })
 
 
@@ -224,13 +224,13 @@ async def set_heat_plate_route(kettle_name, on_off):
 
 
 @app.get("/kettle/{kettle_name}/steering/{on_off}")
-async def set_steering_route(kettle_name, on_off):
+async def set_steering_state_route(kettle_name, on_off):
     app_state: AppState = app.state
     kettle = app_state.assemblies.get(kettle_name)
 
     if kettle is None:
         return JSONResponse(status_code=400, content={
-            "action": "set_steering",
+            "action": "set_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"},
@@ -238,7 +238,7 @@ async def set_steering_route(kettle_name, on_off):
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
-            "action": "set_steering",
+            "action": "set_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"},
@@ -247,7 +247,7 @@ async def set_steering_route(kettle_name, on_off):
     else:
         kettle.set_steering(on_off)
         return JSONResponse(status_code=200, content={
-            "action": "set_steering",
+            "action": "set_steering_state",
             "kettle_name": kettle_name,
             "status": "success",
             "data": {"relay_state": on_off}
@@ -255,63 +255,63 @@ async def set_steering_route(kettle_name, on_off):
 
 
 @app.get("/kettle/{kettle_name}/heat_plate")
-async def get_heat_plate_relay_state_route(kettle_name):
+async def get_heat_plate_state_route(kettle_name):
     app_state: AppState = app.state
     kettle = app_state.assemblies.get(kettle_name)
 
     if kettle is None:
         return JSONResponse(status_code=400, content={
-            "action": "get_heat_plate_relay_state",
+            "action": "get_heat_plate_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
-            "action": "get_heat_plate_relay_state",
+            "action": "get_heat_plate_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
         })
     else:
         return JSONResponse(status_code=200, content={
-            "action": "get_heat_plate_relay_state",
+            "action": "get_heat_plate_state",
             "kettle_name": kettle_name,
             "status": "success",
-            "data": {kettle.heat_plate.rx_message_state}
+            "data": {kettle.heat_plate_state}
         })
 
 
 @app.get("/kettle/{kettle_name}/steering")
-async def get_steering_relay_state_route(kettle_name):
+async def get_steering_state_route(kettle_name):
     app_state: AppState = app.state
     kettle = app_state.assemblies.get(kettle_name)
 
     if kettle is None:
         return JSONResponse(status_code=400, content={
-            "action": "get_steering_relay_state",
+            "action": "get_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
-            "action": "get_steering_relay_state",
+            "action": "get_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
             "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
         })
     else:
         return JSONResponse(status_code=200, content={
-            "action": "get_steering_relay_state",
+            "action": "get_steering_state",
             "kettle_name": kettle_name,
             "status": "success",
-            "data": kettle.steering.rx_message_state
+            "data": kettle.steering_state
         })
 
 
 @app.get("/kettle/{kettle_name}/temp/set")
-async def set_temp_setpoint(kettle_name, r: float = Query(None, description="Desired temperature in Celsius")):
+async def set_temp_setpoint_route(kettle_name, r: float = Query(None, description="Desired temperature in Celsius")):
     app_state: AppState = app.state
     kettle = app_state.assemblies.get(kettle_name)
 
@@ -336,5 +336,5 @@ async def set_temp_setpoint(kettle_name, r: float = Query(None, description="Des
             "action": "set_temp_setpoint",
             "kettle_name": kettle_name,
             "status": "success",
-            "data": {"temp": r}
+            "data": {"temp": kettle.heat_plate_setpoint}
         })

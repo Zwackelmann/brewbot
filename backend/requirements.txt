@@ -12,3 +12,4 @@ pandas
 opencv-python
 Pillow
 pydantic
+pyyaml
