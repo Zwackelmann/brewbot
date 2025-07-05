@@ -2583,7 +2583,7 @@
     (uuid 3d9a1a36-2f4f-43b7-9e0d-58b9f0e71e07)
     (property "Reference" "C7" (id 0) (at 24.13 169.545 0))
     (property "Value" "10uF/16V" (id 1) (at 20.32 171.45 0))
-    (property "Footprint" "Capacitor_SMD:C_1206_3216Metric" (id 2) (at 29.5402 173.99 0)
+    (property "Footprint" "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A" (id 2) (at 29.5402 173.99 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 28.575 170.18 0)
@@ -2958,7 +2958,7 @@
     (property "Value" "10uF/16V" (id 1) (at 241.3 75.3109 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Capacitor_SMD:C_1206_3216Metric" (id 2) (at 238.4552 78.74 0)
+    (property "Footprint" "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A" (id 2) (at 238.4552 78.74 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 237.49 74.93 0)
@@ -3024,7 +3024,7 @@
     (property "Value" "Green" (id 1) (at 71.12 39.37 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Footprint" "led_tube_MEN_12711000:led_tube_MEN_12711000" (id 2) (at 68.58 38.1 0)
+    (property "Footprint" "LED_SMD:LED_0805_2012Metric" (id 2) (at 68.58 38.1 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 68.58 38.1 0)
@@ -3293,7 +3293,7 @@
       (reference "C1") (unit 1) (value "1uF") (footprint "Capacitor_SMD:C_1206_3216Metric")
     )
     (path "/bb2e7277-c4e4-4107-b435-483d93c0988e"
-      (reference "C2") (unit 1) (value "10uF/16V") (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (reference "C2") (unit 1) (value "10uF/16V") (footprint "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A")
     )
     (path "/d3f71e8a-9a2f-4a97-9998-c927aa032ae4"
       (reference "C3") (unit 1) (value "0.1uF") (footprint "Capacitor_SMD:C_1206_3216Metric")
@@ -3308,7 +3308,7 @@
       (reference "C6") (unit 1) (value "22PF") (footprint "Capacitor_SMD:C_1206_3216Metric")
     )
     (path "/3d9a1a36-2f4f-43b7-9e0d-58b9f0e71e07"
-      (reference "C7") (unit 1) (value "10uF/16V") (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (reference "C7") (unit 1) (value "10uF/16V") (footprint "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A")
     )
     (path "/86084dcb-9556-40bb-a19f-7ff0d38f31a7"
       (reference "C8") (unit 1) (value "0.1uF") (footprint "Capacitor_SMD:C_1206_3216Metric")
@@ -3341,7 +3341,7 @@
       (reference "L1") (unit 1) (value "10uH") (footprint "Inductor_SMD:L_Neosid_SMS-ME3010")
     )
     (path "/cb986dfa-de7c-4747-ad08-78d0c57370f5"
-      (reference "LED1") (unit 1) (value "Green") (footprint "led_tube_MEN_12711000:led_tube_MEN_12711000")
+      (reference "LED1") (unit 1) (value "Green") (footprint "LED_SMD:LED_0805_2012Metric")
     )
     (path "/8ef730e6-7745-407b-b999-e674f4f34f5f"
       (reference "R1") (unit 1) (value "1K") (footprint "Resistor_SMD:R_0805_2012Metric")

@@ -367,7 +367,7 @@
       "idf": "",
       "netlist": "motor-module.net",
       "specctra_dsn": "",
-      "step": "",
+      "step": "motor-module.step",
       "vrml": "motor-module.wrl"
     },
     "page_layout_descr_file": ""

@@ -159,7 +159,7 @@
       (net 7 "GND") (pinfunction "E") (pintype "passive") (tstamp f95032ff-5a81-4248-90f1-b314ee907540))
     (pad "3" smd roundrect (at 0.9375 0 90) (size 1.475 0.6) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25)
       (net 17 "/sw-") (pinfunction "C") (pintype "passive") (tstamp 9ee9c836-3de0-4cbe-881f-a9d9b9a2ff13))
-    (model "${KICAD6_3DMODEL_DIR}/Package_TO_SOT_SMD.3dshapes/SOT-23.wrl"
+    (model "${KICAD6_3DMODEL_DIR}/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
       (offset (xyz 0 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -249,7 +249,7 @@
       (net 9 "+5V") (pintype "passive") (tstamp 1845b474-f4b5-4c4f-8e93-35857ac88dfb))
     (pad "A2" thru_hole circle (at 0 -7.62 90) (size 1.6 1.6) (drill 0.8) (layers *.Cu *.Mask)
       (net 17 "/sw-") (pintype "passive") (tstamp 3be3da67-f52b-4d91-8ace-d2d6200c7ffd))
-    (model "${KICAD6_3DMODEL_DIR}/Relay_THT.3dshapes/Relay_DPDT_Finder_30.22.wrl"
+    (model "${KICAD6_3DMODEL_DIR}/Relay_THT.3dshapes/Relay_DPDT_Finder_30.22.step"
       (offset (xyz 0 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -291,7 +291,7 @@
       (net 16 "/CMD2") (pintype "passive") (tstamp 19744714-4ae2-405b-a884-74f4832a7c79))
     (pad "2" smd roundrect (at 0.9125 0) (size 1.025 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.243902)
       (net 1 "CMD") (pintype "passive") (tstamp c22c818d-954a-452b-9282-96e0ba6a901e))
-    (model "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.wrl"
+    (model "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.step"
       (offset (xyz 0 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -393,7 +393,7 @@
       (net 9 "+5V") (pinfunction "K") (pintype "passive") (tstamp 58d704bf-32d7-4df9-aed7-aec5dabecada))
     (pad "2" smd rect (at 2 0) (size 2.5 1.8) (layers "F.Cu" "F.Paste" "F.Mask")
       (net 17 "/sw-") (pinfunction "A") (pintype "passive") (tstamp d386c5ae-f6d5-4eea-acbf-bce4018cbbbb))
-    (model "${KICAD6_3DMODEL_DIR}/Diode_SMD.3dshapes/D_SMA.wrl"
+    (model "${KICAD6_3DMODEL_DIR}/Diode_SMD.3dshapes/D_SMA.step"
       (offset (xyz 0 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -572,7 +572,7 @@
       (net 16 "/CMD2") (pintype "passive") (tstamp d34d68da-f933-479c-a62d-452c84fee361))
     (pad "2" smd roundrect (at 0.9125 0) (size 1.025 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.243902)
       (net 1 "CMD") (pintype "passive") (tstamp 36ddcf56-3569-4a1b-866b-b5bb68f12cc7))
-    (model "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.wrl"
+    (model "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.step"
       (offset (xyz 0 0 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
