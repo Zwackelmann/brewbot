@@ -3,7 +3,6 @@ from brewbot.can.can_env import CanEnv
 from brewbot.assembly.kettle import KettleAssembly
 import asyncio
 from brewbot.util import async_infinite_loop
-import time
 
 
 async def main():

@@ -63,7 +63,6 @@ class CanEnv:
             "mock_sources": {},
             "queue_tasks": {},
             "assemblies": {},
-            "connect_can": None,
             "handle_node_messages": None,
             "process_send_queue": None
         }
@@ -104,7 +103,7 @@ class CanEnv:
         else:
             raise ValueError("Error during task reset: awaited task not done")
 
-        for key in ["connect_can", "handle_node_messages", "process_send_queue"]:
+        for key in ["handle_node_messages", "process_send_queue"]:
             if key not in self.tasks or self.tasks[key] is None:
                 pass
             elif self.tasks[key].done():

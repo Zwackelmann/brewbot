@@ -1,9 +1,11 @@
+from asyncio.tasks import Task
 from fastapi import FastAPI, Query
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 from brewbot.assembly.kettle import KettleAssembly
 from brewbot.config import load_config, CanEnvConfig
 from brewbot.can.can_env import CanEnv
+from brewbot.util import map_tasks
 from typing import Optional
 from dataclasses import dataclass
 import logging
@@ -239,3 +241,26 @@ async def set_temp_setpoint_route(kettle_name, r: float = Query(None, descriptio
             "status": "success",
             "data": {"temp": kettle.heat_plate_setpoint}
         })
+
+
+@app.get("/tasks")
+async def get_tasks_route():
+    app_state: AppState = app.state.app_state
+    can_env: CanEnv = app_state.can_env
+
+    def map_task(task: Optional[Task]):
+        if task is None:
+            return "N/A"
+        elif task.done():
+            return "finished"
+        else:
+            return "running"
+
+    tasks = map_tasks(map_task, can_env.tasks)
+
+    return JSONResponse(status_code=200, content={
+        "action": "get_tasks",
+        "status": "success",
+        "data": tasks
+    })
+

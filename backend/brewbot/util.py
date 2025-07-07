@@ -3,7 +3,7 @@ import importlib
 from contextlib import contextmanager
 
 import numpy as np
-from typing import Any
+from typing import Any, Callable, Optional
 import functools
 import inspect
 import sys
@@ -53,6 +53,16 @@ def collect_tasks(obj) -> list[Task]:
         print(f"invalid type in type dict: {type(obj)}")
 
     return tasks
+
+def map_tasks(map_fun: Callable[[Optional[Task]], Any], obj) -> Any:
+    if obj is None or isinstance(obj, Task):
+        return map_fun(obj)
+    elif isinstance(obj, dict):
+        return {k: map_tasks(map_fun, v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [map_tasks(map_fun, v) for v in obj]
+    else:
+        raise ValueError(f"Unable to map tasks: Invalid type `{type(obj)}`")
 
 def log_exceptions(task: asyncio.Task, name: str = ""):
     def callback(t):
