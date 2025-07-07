@@ -1,13 +1,13 @@
 import asyncio
 from brewbot.util import load_object
-from brewbot.config import Config, NodeConfig, BoundMessage
+from brewbot.config import CanEnvConfig, NodeConfig, BoundMessage
 from brewbot.can.node_state import NodeState
 import random
 from typing import Protocol, Tuple
 
 
 class MockNode(Protocol):
-    async def queue_messages_task(self) -> None:
+    async def queue_messages_coro(self) -> None:
         ...
 
     def handle_message(self, msg_def: BoundMessage, msg: dict) -> None:
@@ -15,7 +15,7 @@ class MockNode(Protocol):
 
 
 class MockThermometer(MockNode):
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
     msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
     mock_state: "MockState"
@@ -27,7 +27,7 @@ class MockThermometer(MockNode):
     v_to_temp_m: float
     v_to_temp_b: float
 
-    def __init__(self, conf: Config, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
         self.conf = conf
         self.node_conf = node_conf
         self.msg_queue = msg_queue
@@ -46,7 +46,7 @@ class MockThermometer(MockNode):
     def handle_message(self, msg_def: BoundMessage, msg: dict) -> None:
         raise ValueError("invalid message")
 
-    async def queue_messages_task(self):
+    async def queue_messages_coro(self):
         while True:
             try:
                 temp_c = self.mock_state.temp + self.measure_error()
@@ -62,14 +62,14 @@ class MockThermometer(MockNode):
 
 
 class MockRelay(MockNode):
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
     msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
     mock_state: "MockState"
     msg_interval: float
     relay_state: dict
 
-    def __init__(self, conf: Config, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
         self.conf = conf
         self.node_conf = node_conf
         self.msg_queue = msg_queue
@@ -84,7 +84,7 @@ class MockRelay(MockNode):
         else:
             raise ValueError("invalid message")
 
-    async def queue_messages_task(self):
+    async def queue_messages_coro(self):
         while True:
             try:
                 msg_def = self.node_conf.message('relay_state')
@@ -95,7 +95,7 @@ class MockRelay(MockNode):
 
 
 class MockState:
-    def __init__(self, conf: Config, node_states: dict[str, NodeState]):
+    def __init__(self, conf: CanEnvConfig, node_states: dict[str, NodeState]):
         self.temp = 20.0
         self.effective_power = 0.0
         self.p_on = 5000   # power heat plate is on (W)
@@ -122,7 +122,7 @@ class MockState:
 
         self.temp += temp_diff
 
-    async def simulation_task(self):
+    async def simulation_coro(self):
         while True:
             try:
                 self.simulate(self.simulation_interval)
@@ -131,7 +131,7 @@ class MockState:
                 break
 
 
-def gen_mock_nodes(conf: Config, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: MockState) -> dict[str, MockNode]:
+def gen_mock_nodes(conf: CanEnvConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: MockState) -> dict[str, MockNode]:
     mock_nodes = {}
     for node in conf.nodes:
         if node.debug.get('mock', False):

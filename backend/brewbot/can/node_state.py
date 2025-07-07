@@ -1,24 +1,27 @@
 import pandas as pd
 import asyncio
-from brewbot.config import Config, NodeConfig, BoundMessage
+from brewbot.config import CanEnvConfig, NodeConfig, BoundMessage
 from brewbot.data.df import WindowedDataFrame
-from brewbot.util import format_on_off, load_object
+from brewbot.util import format_on_off, load_object, async_infinite_loop
 import time
 import numpy as np
 from typing import Optional, Callable, Tuple
 
 
 class NodeState:
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
     rx_message_state: dict[str, Optional[dict]]
     rx_message_handler: dict[str, list[Callable[[dict], None]]]
 
-    def __init__(self, conf: Config, node_conf: NodeConfig):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig):
         self.conf = conf
         self.node_conf = node_conf
-        self.rx_message_state = {msg.key: None for msg in node_conf.messages if msg.direction == "rx"}
-        self.rx_message_handler = {msg.key: [] for msg in node_conf.messages if msg.direction == "rx"}
+        self.reset_message_state()
+        self.rx_message_handler = {msg.key: [] for msg in self.node_conf.messages if msg.direction == "rx"}
+
+    def reset_message_state(self):
+        self.rx_message_state = {msg.key: None for msg in self.node_conf.messages if msg.direction == "rx"}
 
     def update_rx_state(self, msg_def: BoundMessage | str, msg: dict) -> None:
         if isinstance(msg_def, BoundMessage):
@@ -44,40 +47,37 @@ class NodeState:
 
         self.rx_message_handler[msg_key].append(handler)
 
-    def queue_tasks(self, send_queue: list[Tuple[NodeConfig, BoundMessage, dict]]):
-        tasks = []
+    def queue_coros(self, send_queue: list[Tuple[NodeConfig, BoundMessage, dict]]):
+        coros = []
         for msg_def in [msg_def for msg_def in self.node_conf.messages if msg_def.direction == "tx" and msg_def.frequency is not None]:
-            async def _task():
-                while True:
-                    try:
-                        send_queue.append((self.node_conf, msg_def, self.tx_msg(msg_def)))
-                        await asyncio.sleep(1.0 / msg_def.frequency)
-                    except asyncio.CancelledError:
-                        break
-            tasks.append(_task)
+            @async_infinite_loop
+            async def _coro():
+                send_queue.append((self.node_conf, msg_def, self.tx_msg(msg_def)))
+                await asyncio.sleep(1.0 / msg_def.frequency)
+            coros.append(_coro)
 
-        return tasks
+        return coros
 
     def tx_msg(self, msg_def: BoundMessage) -> dict:
         ...
 
 
 class MasterNodeState(NodeState):
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
 
-    def __init__(self, conf: Config, node_conf: NodeConfig):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig):
         super().__init__(conf, node_conf)
 
 
 class ThermometerNodeState(NodeState):
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
     window: float
     temp_c_frame: WindowedDataFrame
     temp_v_frame: WindowedDataFrame
 
-    def __init__(self, conf: Config, node_conf: NodeConfig):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig):
         super().__init__(conf, node_conf)
         self.window = node_conf.params['window']
         self.temp_c_frame = WindowedDataFrame(self.window, columns=["t", "y"], index_column="t")
@@ -121,11 +121,11 @@ class ThermometerNodeState(NodeState):
 
 
 class RelayNodeState(NodeState):
-    conf: Config
+    conf: CanEnvConfig
     node_conf: NodeConfig
     cmd_state: bool
 
-    def __init__(self, conf: Config, node_conf: NodeConfig):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig):
         super().__init__(conf, node_conf)
         self.cmd_state = False
 
@@ -136,7 +136,7 @@ class RelayNodeState(NodeState):
             raise ValueError("Invalid message")
 
 
-def gen_node_states(conf: Config) -> dict[str, NodeState]:
+def gen_node_states(conf: CanEnvConfig) -> dict[str, NodeState]:
     node_states = {}
     for node in conf.nodes:
         if node.node_state_class is not None:

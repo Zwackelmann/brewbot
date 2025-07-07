@@ -9,14 +9,14 @@ import asyncio
 import time
 import numpy as np
 import logging
-import sys
+from cysystemd import journal
 
 
 logger = logging.getLogger("brewbot.assembly.kettle")
 logger.setLevel(logging.INFO)
 
 if not logger.hasHandlers():  # Prevent duplicate logs if already configured
-    handler = logging.StreamHandler(sys.stdout)
+    handler = journal.JournaldLogHandler()
     formatter = logging.Formatter("[%(levelname)s] %(asctime)s %(name)s: %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -84,8 +84,7 @@ class KettleAssembly(Assembly):
 
         eps = 1e-6
         if np.isnan(dc):
-            logger.info("nan dc -> heat plate off")
-            self.set_heat_plate("off")
+            logger.info("nan dc -> don't control")
             await asyncio.sleep(interval_time)
         elif dc < (low_jump_thres - eps):
             logger.info("dc < low_jump_tres -> set heat plate off")
@@ -120,7 +119,7 @@ class KettleAssembly(Assembly):
 
         return duty_cycle(cs, max_cs, low_jump_thres, high_jump_thres)
 
-    def background_tasks(self) -> list[Coroutine]:
+    def coros(self) -> list[Coroutine]:
         return [self.collect_data(), self.control_heat_plate()]
 
     @classmethod

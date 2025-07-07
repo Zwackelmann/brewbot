@@ -24,10 +24,11 @@ class CanBusConfig(BaseModel):
     receive_timeout: float
 
 
-class CanConfig(BaseModel):
+class CanPortConfig(BaseModel):
     dbc_file: str
     process_interval: float
     bus: Optional[CanBusConfig] = None
+    device_connect_interval: float
 
 
 class SignalDefConfig(BaseModel):
@@ -329,9 +330,9 @@ class TempSignalControllerConfig(BaseModel):
     high_jump_thres: float
 
 
-class Config:
+class CanEnvConfig:
     conf_dict: dict
-    can: CanConfig
+    port: CanPortConfig
     dbc: Database
     message_types: list[MsgTypeConfig]
     node_types: list[NodeTypeConfig]
@@ -347,8 +348,8 @@ class Config:
 
     def __init__(self, conf_dict):
         self.conf_dict = conf_dict
-        self.can = CanConfig(**conf_dict['can'])
-        self.dbc = load_dbc_file(self.can.dbc_file)
+        self.port = CanPortConfig(**conf_dict['port'])
+        self.dbc = load_dbc_file(self.port.dbc_file)
 
         self.message_types = []
         self._message_types_by_key = {}
@@ -402,10 +403,10 @@ class Config:
         return self._assembly_by_key[key]
 
 
-def load_config_dict(path=CONFIG_PATH):
+def load_config_dict(path=CONFIG_PATH) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
 
-def load_config(path=CONFIG_PATH):
+def load_config(path=CONFIG_PATH) -> CanEnvConfig:
     conf_dict = load_config_dict(path)
-    return Config(conf_dict)
+    return CanEnvConfig(conf_dict)

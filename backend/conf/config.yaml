@@ -1,10 +1,11 @@
-can:
+port:
   dbc_file: "conf/messages.dbc"
   bus:
     channel: "can-bb"
     interface: "socketcan"
     receive_timeout: 0.001
   process_interval: 0.001
+  device_connect_interval: 0.1
 message_types:
 - key: "temp_state"
   priority: 6
@@ -46,7 +47,7 @@ node_types:
   - key: "relay_cmd"
     msg_type_ref: "relay_cmd"
     direction: "tx"
-    frequency: 0.5 # msg / s
+    frequency: 2.0 # msg / s
   node_state_class: "brewbot.can.node_state:RelayNodeState"
   mock_class: "brewbot.can.mock:MockRelay"
 nodes:
@@ -56,28 +57,28 @@ nodes:
   node_addr: 16  # 0x10
   message_bindings: []
   debug: {}
-- key: "thermometer_1"
-  name: "TEMP_NODE_1"
-  node_type_ref: "thermometer"
-  node_addr: 112 # 0x70
-  message_bindings:
-  - ref_key: "temp_state"
-    dbc_msg: "TEMP_STATE_1"
-  params:
-    window: 10.0 # s
-  debug:
-    mock: false
-# - key: "thermometer_2"
-#   name: "TEMP_NODE_2"
+# - key: "thermometer_1"
+#   name: "TEMP_NODE_1"
 #   node_type_ref: "thermometer"
-#   node_addr: 113 # 0x71
+#   node_addr: 112 # 0x70
 #   message_bindings:
 #   - ref_key: "temp_state"
-#     dbc_msg: "TEMP_STATE_2"
+#     dbc_msg: "TEMP_STATE_1"
 #   params:
 #     window: 10.0 # s
 #   debug:
 #     mock: false
+- key: "thermometer_2"
+  name: "TEMP_NODE_2"
+  node_type_ref: "thermometer"
+  node_addr: 113 # 0x71
+  message_bindings:
+  - ref_key: "temp_state"
+    dbc_msg: "TEMP_STATE_2"
+  params:
+    window: 10.0 # s
+  debug:
+    mock: false
 - key: "motor_1"
   name: "MOTOR_NODE_1"
   node_type_ref: "relay"
@@ -108,8 +109,8 @@ assemblies:
   assembly_type_ref: "kettle"
   nodes:
     thermometer:
-    - "thermometer_1"
-    # - "thermometer_2"
+    # - "thermometer_1"
+    - "thermometer_2"
     motor: "motor_1"
     heat_plate: "heat_plate_1"
   params:

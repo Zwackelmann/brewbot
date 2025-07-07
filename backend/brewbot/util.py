@@ -1,9 +1,14 @@
 import asyncio
 import importlib
+from contextlib import contextmanager
+
 import numpy as np
 from typing import Any
 import functools
 import inspect
+import sys
+import os
+from asyncio.tasks import Task
 
 
 def async_infinite_loop(fun):
@@ -31,6 +36,24 @@ def async_infinite_loop(fun):
         return _coroutine
 
 
+def collect_tasks(obj) -> list[Task]:
+    tasks = []
+    if isinstance(obj, Task):
+        tasks.append(obj)
+    elif isinstance(obj, dict):
+        for item in [_item for _, _item in obj.items()]:
+            tasks.extend(collect_tasks(item))
+    elif isinstance(obj, list):
+        for item in obj:
+            tasks.extend(collect_tasks(item))
+    elif obj is None:
+        # task dicts can contain `None` tasks as placeholder
+        pass
+    else:
+        print(f"invalid type in type dict: {type(obj)}")
+
+    return tasks
+
 def log_exceptions(task: asyncio.Task, name: str = ""):
     def callback(t):
         try:
@@ -42,6 +65,15 @@ def log_exceptions(task: asyncio.Task, name: str = ""):
     task.add_done_callback(callback)
     return task
 
+@contextmanager
+def suppress_stderr():
+    old_stderr = sys.stderr
+    try:
+        sys.stderr = open(os.devnull, 'w')
+        yield
+    finally:
+        sys.stderr.close()
+        sys.stderr = old_stderr
 
 def parse_on_off(on_off: Any) -> bool:
     if on_off is None:

@@ -1,0 +1,14 @@
+[Unit]
+Description=Brewbot FastAPI Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/simon/.local/apps/brewbot
+ExecStart=/home/simon/.local/apps/brewbot/venv/bin/uvicorn brewbot.rest.api:app --reload --host 0.0.0.0 --port 8000
+Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
