@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 import asyncio
 import tkinter as tk
 from brewbot.calibrate.cam import Cam
 from brewbot.calibrate.box_config_app import BoxConfigApp, capture_digits
-from brewbot.calibrate.can_temp_reader import CanTempReader
+from brewbot.can.can_env import CanEnv
+from brewbot.config import load_config, CanEnvConfig
 import time
-import numpy as np
 import os
 import json
 import datetime
@@ -16,18 +16,20 @@ import datetime
 class AppState:
     active_components: set[str]
     finished: bool
-    digit_boxes: list[((int, int), (int, int), (int, int), (int, int))]
-    preview_image_dims: (int, int)
-    digit_image_dims: (int, int)
-    digit_segment_boxes: list[((float, float, float, float), int)]
+    digit_boxes: list[Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int], Tuple[int, int]]]
+    preview_image_dims: Tuple[int, int]
+    digit_image_dims: Tuple[int, int]
+    digit_segment_boxes: list[Tuple[Tuple[float, float, float, float], int]]
     tk_root: Optional[tk.Tk]
     box_config_app: Optional[BoxConfigApp]
-    cam: Cam
+    cam: Optional[Cam]
     show_capture_digits_debug_windows: bool
     parsed_digit: Optional[int]
-    can_temp_node_names: list[str]
-    can_temp_readers: dict[str, CanTempReader]
-    can_temp_vs: list[(float, float)]
+    # can_temp_node_names: list[str]
+    # can_temp_readers: dict[str, CanTempReader]
+    can_conf: Optional[CanEnvConfig]
+    can_env: Optional[CanEnv]
+    can_temp_vs: list[Tuple[float, float]]
     temp_v_aggregate_time: float
     recording_file: str
 
@@ -55,7 +57,7 @@ async def capture_digits_task(app_state: AppState):
         await asyncio.sleep(0.5)
 
 
-async def update_can_task(app_state: AppState):
+"""async def update_can_task(app_state: AppState):
     for node_name in app_state.can_temp_node_names:
         if node_name not in app_state.can_temp_readers:
             app_state.can_temp_readers[node_name] = CanTempReader(node_name)
@@ -72,7 +74,7 @@ async def update_can_task(app_state: AppState):
 
                     print(node_name, temp_msg['TEMP_C'])
 
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.01)"""
 
 
 async def tk_mainloop_task(app_state: AppState):
@@ -126,7 +128,13 @@ async def output_task(app_state: AppState):
         while not app_state.finished:
             if "output" in app_state.active_components:
                 real_temp_c = app_state.parsed_digit
-                can_temp_v = float(np.mean([v for t, v in app_state.can_temp_vs]))
+
+                if "thermometer_1" in app_state.can_env.node_states and \
+                        "temp_state" in app_state.can_env.node_states['thermometer_1'].rx_message_state and \
+                        app_state.can_env.node_states['thermometer_1'].rx_message_state['temp_state'] is not None:
+                    can_temp_v = app_state.can_env.node_states['thermometer_1'].rx_message_state['temp_state'].get("temp_v")
+                else:
+                    can_temp_v = None
 
                 d = {
                     "time": datetime.datetime.now(datetime.UTC).isoformat(),
@@ -138,14 +146,20 @@ async def output_task(app_state: AppState):
                 f.write(f"{json.dumps(d)}\n")
                 f.flush()
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.0)
 
 
 async def main():
     time_str = time.strftime("%Y-%m-%dT%H-%M-%S", time.localtime())
 
     app_state = AppState(
-        active_components={"tk_mainloop", "read_cam", "update_can", "update_input_image"},
+        active_components={# "tk_mainloop",
+                           # "read_cam",
+                           # "update_can",
+                           "output",
+                           "capture_digits",
+                           # "update_input_image"
+                           },
         finished=False,
         digit_boxes = [
             ((273, 83), (342, 83), (332, 195), (264, 196)),
@@ -164,23 +178,28 @@ async def main():
         ],
         tk_root = None,
         box_config_app = None,
-        cam = None, # Cam(0),
+        cam = Cam(0), # Cam(0),
         show_capture_digits_debug_windows = False,
-        parsed_digit=None,
-        can_temp_readers = {},
-        can_temp_node_names = ["temp_1", "temp_2"],
+        parsed_digit=70,
+        # can_temp_readers = {},
+        # can_temp_node_names = ["temp_1", "temp_2"],
+        can_conf = load_config(),
+        can_env=None,
         can_temp_vs = [],
         temp_v_aggregate_time = 1.0,
         recording_file=os.path.join("recordings", f"rec_{time_str}.txt")
     )
+
+    app_state.can_env = CanEnv(app_state.can_conf)
+    app_state.can_env.run()
 
     tasks = [
         # asyncio.create_task(tk_mainloop_task(app_state)),
         # asyncio.create_task(update_cam_task(app_state)),
         # asyncio.create_task(update_input_image_task(app_state)),
         # asyncio.create_task(capture_digits_task(app_state)),
-        asyncio.create_task(update_can_task(app_state)),
-        # asyncio.create_task(output_task(app_state))
+        # asyncio.create_task(update_can_task(app_state)),
+        asyncio.create_task(output_task(app_state))
     ]
 
     await asyncio.gather(*tasks)

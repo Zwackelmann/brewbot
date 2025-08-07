@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from brewbot.config import CanPortConfig
-from brewbot.util import async_infinite_loop, suppress_stderr
+from brewbot.util import  suppress_stderr
 from cysystemd import journal
 from typing import Callable
 

@@ -1,11 +1,11 @@
 import can
 from brewbot.can.util import pgn_to_can_id, can_id_to_pgn
-from brewbot.config import NodeConfig, BoundMessage
+from brewbot.config import NodeConfig, NodeMessageConfig
 from typing import Optional, Tuple
 
 
 class MsgRegistry:
-    msg_by_pgn: dict[int, list[Tuple[NodeConfig, BoundMessage]]]
+    msg_by_pgn: dict[int, list[Tuple[NodeConfig, NodeMessageConfig]]]
     nodes: list[NodeConfig]
 
     _nodes_by_key: dict[str, NodeConfig]
@@ -20,19 +20,19 @@ class MsgRegistry:
                 if msg_def.direction == "rx":
                     self.msg_by_pgn.setdefault(msg_def.dbc_msg.frame_id, []).append((node, msg_def))
 
-    def decode(self, msg: can.Message) -> Optional[Tuple[NodeConfig, BoundMessage, dict]]:
+    def decode(self, msg: can.Message) -> Optional[Tuple[NodeConfig, NodeMessageConfig, dict]]:
         if msg is None:
             return None
 
         pgn, priority, msg_src_addr, msg_dest_addr = can_id_to_pgn(msg.arbitration_id)
-        msg_def_candidates: Optional[list[Tuple[NodeConfig, BoundMessage]]] = self.msg_by_pgn.get(pgn)
+        msg_def_candidates: Optional[list[Tuple[NodeConfig, NodeMessageConfig]]] = self.msg_by_pgn.get(pgn)
 
         if msg_def_candidates is None:
             return None
         else:
             for node, msg_def in msg_def_candidates:
                 if (node.node_addr is None or msg_dest_addr == 0xFF or msg_dest_addr == node.node_addr) \
-                        and (msg_def.src_addr is None or msg_src_addr == msg_def.src_addr):
+                        and (node.node_addr is None or msg_src_addr == node.node_addr):
                     return node, msg_def, msg_def.decode(msg_def.dbc_msg.decode(msg.data))
 
         return None
@@ -40,7 +40,7 @@ class MsgRegistry:
     def encode(self, target_node_key: str, msg_key: str, msg: dict, src_node_key: str = 'master') -> can.Message:
         src_node: NodeConfig = self._nodes_by_key[src_node_key]
         target_node: NodeConfig = self._nodes_by_key[target_node_key]
-        msg_def: BoundMessage = self._nodes_by_key[target_node_key].message(msg_key)
+        msg_def: NodeMessageConfig = self._nodes_by_key[target_node_key].message(msg_key)
         data: bytes = msg_def.dbc_msg.encode(msg_def.encode(msg))
 
         return can.Message(

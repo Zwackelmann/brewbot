@@ -1,6 +1,6 @@
 import pandas as pd
 import asyncio
-from brewbot.config import CanEnvConfig, NodeConfig, BoundMessage
+from brewbot.config import CanEnvConfig, NodeConfig, NodeMessageConfig
 from brewbot.data.df import WindowedDataFrame
 from brewbot.util import format_on_off, load_object, async_infinite_loop
 import time
@@ -23,8 +23,8 @@ class NodeState:
     def reset_message_state(self):
         self.rx_message_state = {msg.key: None for msg in self.node_conf.messages if msg.direction == "rx"}
 
-    def update_rx_state(self, msg_def: BoundMessage | str, msg: dict) -> None:
-        if isinstance(msg_def, BoundMessage):
+    def update_rx_state(self, msg_def: NodeMessageConfig | str, msg: dict) -> None:
+        if isinstance(msg_def, NodeMessageConfig):
             msg_key = msg_def.key
         else:
             msg_key = msg_def
@@ -36,8 +36,8 @@ class NodeState:
         for handler in self.rx_message_handler[msg_key]:
             handler(msg)
 
-    def register_rx_message_handler(self, msg_def: BoundMessage | str, handler: Callable[[dict], None]):
-        if isinstance(msg_def, BoundMessage):
+    def register_rx_message_handler(self, msg_def: NodeMessageConfig | str, handler: Callable[[dict], None]):
+        if isinstance(msg_def, NodeMessageConfig):
             msg_key = msg_def.key
         else:
             msg_key = msg_def
@@ -47,7 +47,7 @@ class NodeState:
 
         self.rx_message_handler[msg_key].append(handler)
 
-    def queue_coros(self, send_queue: list[Tuple[NodeConfig, BoundMessage, dict]]):
+    def queue_coros(self, send_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]]):
         coros = []
         for msg_def in [msg_def for msg_def in self.node_conf.messages if msg_def.direction == "tx" and msg_def.frequency is not None]:
             @async_infinite_loop
@@ -58,7 +58,7 @@ class NodeState:
 
         return coros
 
-    def tx_msg(self, msg_def: BoundMessage) -> dict:
+    def tx_msg(self, msg_def: NodeMessageConfig) -> dict:
         ...
 
 
@@ -82,13 +82,13 @@ class ThermometerNodeState(NodeState):
         self.window = node_conf.params['window']
         self.temp_c_frame = WindowedDataFrame(self.window, columns=["t", "y"], index_column="t")
         self.temp_v_frame = WindowedDataFrame(self.window, columns=["t", "y"], index_column="t")
-        self.register_rx_message_handler("temp_state", self.temp_msg_update)
+        self.register_rx_message_handler("therm_state", self.therm_state_update)
 
-    def temp_msg_update(self, msg: dict) -> None:
+    def therm_state_update(self, msg: dict) -> None:
         self.temp_c_frame.append({"t": [time.time()], "y": [msg['temp_c']]})
         self.temp_v_frame.append({"t": [time.time()], "y": [msg['temp_v']]})
 
-    def temp_state(self) -> dict:
+    def therm_state(self) -> dict:
         if len(self.temp_c_frame.df) != 0:
             temp_c = ThermometerNodeState.interp(self.temp_c_frame.df, time.time(), self.window)
         else:
@@ -129,7 +129,7 @@ class RelayNodeState(NodeState):
         super().__init__(conf, node_conf)
         self.cmd_state = False
 
-    def tx_msg(self, msg_def: BoundMessage) -> dict:
+    def tx_msg(self, msg_def: NodeMessageConfig) -> dict:
         if msg_def.key == "relay_cmd":
             return {'on': format_on_off(self.cmd_state)}
         else:

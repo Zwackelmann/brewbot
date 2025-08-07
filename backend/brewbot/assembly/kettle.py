@@ -40,8 +40,8 @@ class KettleAssembly(Assembly):
         self.temp_df = WindowedDataFrame(data_collect_conf.window, columns=["t", "y"], index_column="t")
 
     @property
-    def temp_state(self) -> dict[str, float]:
-        return avg_dict([t.temp_state() for t in self.thermometers])
+    def therm_state(self) -> dict[str, float]:
+        return avg_dict([t.therm_state() for t in self.thermometers])
 
     @property
     def heat_plate_state(self):
@@ -62,7 +62,7 @@ class KettleAssembly(Assembly):
 
     @async_infinite_loop
     async def collect_data(self):
-        temp_c = self.temp_state.get("temp_c")
+        temp_c = self.therm_state.get("temp_c")
         if temp_c is not None:
             self.temp_df.append({"t": [time.time()], "y": [temp_c]})
 
@@ -110,7 +110,7 @@ class KettleAssembly(Assembly):
         d_gain = self.controller_conf.d_gain
         cs = p * p_gain + d * d_gain
 
-        logger.info(f"temp: {self.temp_state.get("temp_c"):4.2f}")
+        logger.info(f"temp: {self.therm_state.get("temp_c"):4.2f}")
         logger.info(f"p-comp: {p * p_gain: 4.2f}  ==  d-comp: {d * d_gain: 4.2f}  ==  cs: {cs: 4.2f}")
 
         max_cs = self.controller_conf.max_cs

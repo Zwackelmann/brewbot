@@ -4,7 +4,7 @@ import logging
 from asyncio.tasks import Task
 from brewbot.can.mock import MockNode, MockState, gen_mock_nodes
 from brewbot.can.node_state import NodeState, gen_node_states
-from brewbot.config import CanEnvConfig, NodeConfig, BoundMessage
+from brewbot.config import CanEnvConfig, NodeConfig, NodeMessageConfig
 from brewbot.assembly.assembly import Assembly, gen_assemblies
 from brewbot.util import async_infinite_loop, log_exceptions, collect_tasks
 from brewbot.can.can_port import CanPort
@@ -25,7 +25,7 @@ if not logger.hasHandlers():  # Prevent duplicate logs if already configured
 class CanEnv:
     conf: CanEnvConfig
     can_port: CanPort
-    send_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
+    send_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]]
 
     msg_reg: MsgRegistry
     node_states: dict[str, NodeState]
@@ -33,7 +33,7 @@ class CanEnv:
 
     mock_nodes: dict[str, MockNode]
     mock_state: MockState
-    mock_msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
+    mock_msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]]
 
     main_queue: list[Coroutine]
     main_task: Optional[Task]
@@ -136,13 +136,13 @@ class CanEnv:
 
         return self.msg_reg.decode(msg)
 
-    def handle_message(self, node: NodeConfig, msg_def: BoundMessage, msg: dict) -> None:
+    def handle_message(self, node: NodeConfig, msg_def: NodeMessageConfig, msg: dict) -> None:
         node_state = self.node_states.get(node.key)
 
         if node_state is not None:
             node_state.update_rx_state(msg_def, msg)
 
-    def send_message(self, node: NodeConfig, msg_def: BoundMessage, msg: dict) -> None:
+    def send_message(self, node: NodeConfig, msg_def: NodeMessageConfig, msg: dict) -> None:
         msg_def = node.message(msg_def.key)
 
         if node.debug.get('mock', False):

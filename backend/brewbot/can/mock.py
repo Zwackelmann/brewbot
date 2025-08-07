@@ -1,6 +1,6 @@
 import asyncio
 from brewbot.util import load_object
-from brewbot.config import CanEnvConfig, NodeConfig, BoundMessage
+from brewbot.config import CanEnvConfig, NodeConfig, NodeMessageConfig
 from brewbot.can.node_state import NodeState
 import random
 from typing import Protocol, Tuple
@@ -10,14 +10,14 @@ class MockNode(Protocol):
     async def queue_messages_coro(self) -> None:
         ...
 
-    def handle_message(self, msg_def: BoundMessage, msg: dict) -> None:
+    def handle_message(self, msg_def: NodeMessageConfig, msg: dict) -> None:
         ...
 
 
 class MockThermometer(MockNode):
     conf: CanEnvConfig
     node_conf: NodeConfig
-    msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
+    msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]]
     mock_state: "MockState"
     msg_interval: float
 
@@ -27,7 +27,7 @@ class MockThermometer(MockNode):
     v_to_temp_m: float
     v_to_temp_b: float
 
-    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]], mock_state: "MockState"):
         self.conf = conf
         self.node_conf = node_conf
         self.msg_queue = msg_queue
@@ -43,7 +43,7 @@ class MockThermometer(MockNode):
     def measure_error(self) -> float:
         return random.gauss(self.error_mu, self.error_sigma)
 
-    def handle_message(self, msg_def: BoundMessage, msg: dict) -> None:
+    def handle_message(self, msg_def: NodeMessageConfig, msg: dict) -> None:
         raise ValueError("invalid message")
 
     async def queue_messages_coro(self):
@@ -52,7 +52,7 @@ class MockThermometer(MockNode):
                 temp_c = self.mock_state.temp + self.measure_error()
                 temp_v = (temp_c - self.v_to_temp_b) / self.v_to_temp_m
 
-                msg_def = self.node_conf.message('temp_state')
+                msg_def = self.node_conf.message('therm_state')
                 msg = {'temp_v': temp_v, 'temp_c': temp_c}
                 self.msg_queue.append((self.node_conf, msg_def, msg))
 
@@ -64,12 +64,12 @@ class MockThermometer(MockNode):
 class MockRelay(MockNode):
     conf: CanEnvConfig
     node_conf: NodeConfig
-    msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]]
+    msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]]
     mock_state: "MockState"
     msg_interval: float
     relay_state: dict
 
-    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: "MockState"):
+    def __init__(self, conf: CanEnvConfig, node_conf: NodeConfig, msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]], mock_state: "MockState"):
         self.conf = conf
         self.node_conf = node_conf
         self.msg_queue = msg_queue
@@ -78,7 +78,7 @@ class MockRelay(MockNode):
 
         self.relay_state = {'on': False}
 
-    def handle_message(self, msg_def: BoundMessage, msg: dict) -> None:
+    def handle_message(self, msg_def: NodeMessageConfig, msg: dict) -> None:
         if msg_def.key == 'relay_cmd':
             self.relay_state = msg
         else:
@@ -131,7 +131,7 @@ class MockState:
                 break
 
 
-def gen_mock_nodes(conf: CanEnvConfig, msg_queue: list[Tuple[NodeConfig, BoundMessage, dict]], mock_state: MockState) -> dict[str, MockNode]:
+def gen_mock_nodes(conf: CanEnvConfig, msg_queue: list[Tuple[NodeConfig, NodeMessageConfig, dict]], mock_state: MockState) -> dict[str, MockNode]:
     mock_nodes = {}
     for node in conf.nodes:
         if node.debug.get('mock', False):

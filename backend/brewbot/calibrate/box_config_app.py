@@ -319,6 +319,7 @@ def capture_digits(frame, digit_boxes, digit_image_dims, digit_segment_boxes, sh
         ], dtype="float32")
 
         mat = cv2.getPerspectiveTransform(src_points, dst_points)
+
         digit_image = cv2.warpPerspective(frame, mat, (digit_image_dims[1], digit_image_dims[0]))
         active_segments = find_active_segments(digit_image, digit_segment_boxes)
         digits.append(segments_to_number(active_segments))

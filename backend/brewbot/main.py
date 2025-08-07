@@ -1,8 +1,10 @@
-from brewbot.config import load_config
+from brewbot.config import load_config, CanEnvConfig
 from brewbot.can.can_env import CanEnv
 from brewbot.assembly.kettle import KettleAssembly
 import asyncio
 from brewbot.util import async_infinite_loop
+from brewbot.can.util import pdu_format, pgn_to_can_id, is_pdu_format_1
+from cantools.database import Database, load_string as load_dbc_string, Message
 
 
 async def main():
@@ -14,7 +16,7 @@ async def main():
         kettle = can_env.assemblies.get('kettle_1')
 
         if isinstance(kettle, KettleAssembly):
-            print(kettle.temp_state)
+            print(kettle.therm_state)
 
             is_on = None
             relay_state = kettle.heat_plate_state.get("relay_state")
@@ -24,8 +26,10 @@ async def main():
 
             if is_on:
                 kettle.set_heat_plate(False)
+                kettle.set_steering(True)
             else:
                 kettle.set_heat_plate(True)
+                kettle.set_steering(False)
 
         await asyncio.sleep(2.5)
 
@@ -39,4 +43,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    print(is_pdu_format_1(0x1031))
+    print(pgn_to_can_id(0x1031, 6, 0x10, 0x80))

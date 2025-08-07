@@ -1,4 +1,4 @@
-from brewbot.config import AssemblyConfig, CanEnvConfig
+from brewbot.config import AssemblyConfig
 from brewbot.util import load_object
 from typing import Protocol, Coroutine
 from brewbot.can.node_state import NodeState

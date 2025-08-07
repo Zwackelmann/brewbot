@@ -4,7 +4,7 @@
 #include "util.h"
 
 #define TEMP_VOLTAGE_PIN  A0
-#define LOOP_DELAY         5
+#define LOOP_DELAY         1
 #define CAN_DLC            8
 #define CS_PIN            10
 
@@ -12,11 +12,11 @@
 #define CAN_ID_MASK  0x1FFFFFFF
 
 // voltage assumed when analog read returns maximum value
-#define V_MAX 5.033
+#define V_MAX 5.0
 // maximum value for analog voltage reading
 #define VINT_MAX ((1 << 10) - 1)
 
-#define SEND_STATUS_INTERVAL 100
+#define SEND_STATUS_INTERVAL 500
 
 #define BOARD_ID 1
 
@@ -25,11 +25,11 @@
   #define NODE_ADDR    0x70
 
   // x^2 coefficient for v_to_temp function
-  #define V_TO_TEMP_X2 3.0980205
+  #define V_TO_TEMP_X2 0.0
   // x^1 coefficient for v_to_temp function
-  #define V_TO_TEMP_X1 35.82164965
+  #define V_TO_TEMP_X1 52.91855855
   // x^0 coefficient for v_to_temp function
-  #define V_TO_TEMP_X0 -49.55763119
+  #define V_TO_TEMP_X0 -71.94292841
 #elif BOARD_ID == 2
   #define TEMP_STATE_PNG  0xFFC2
   #define NODE_ADDR    0x71
@@ -69,8 +69,8 @@ void read_sample() {
 }
 
 double curr_v() {
-  uint32_t vint = vint_sum / n_samples;
-  return ((double)vint * V_MAX) / VINT_MAX;
+  double v_raw = ((double)vint_sum) / n_samples;
+  return (v_raw * V_MAX) / VINT_MAX;
 }
 
 double fetch_and_reset_v() {

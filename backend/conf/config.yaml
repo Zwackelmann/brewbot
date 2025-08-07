@@ -1,5 +1,4 @@
 port:
-  dbc_file: "conf/messages.dbc"
   bus:
     channel: "can-bb"
     interface: "socketcan"
@@ -7,98 +6,150 @@ port:
   process_interval: 0.001
   device_connect_interval: 0.1
 message_types:
-- key: "temp_state"
+- key: "node_info"
+  dbc_name: "NODE_INFO"
   priority: 6
+  pgn: 65296  # 0xFF10
+  direction: "rx"
+  signals:
+  - key: "node_type"
+    dbc_name: "NODE_TYPE"
+    start_bit: 0
+    signal_size: 7
+    c_type: "uint8_t"
+    py_type: "int"
+  - key: "node_id"
+    dbc_name: "NODE_ID"
+    start_bit: 7
+    signal_size: 7
+    c_type: "uint8_t"
+    py_type: "int"
+  - key: "version_major"
+    dbc_name: "VERSION_MAJOR"
+    start_bit: 14
+    signal_size: 6
+    c_type: "uint8_t"
+    py_type: "int"
+  - key: "version_minor"
+    dbc_name: "VERSION_MINOR"
+    start_bit: 20
+    signal_size: 6
+    c_type: "uint8_t"
+    py_type: "int"
+  - key: "version_patch"
+    dbc_name: "VERSION_PATCH"
+    start_bit: 26
+    signal_size: 6
+    c_type: "uint8_t"
+    py_type: "int"
+  - key: "uptime"
+    dbc_name: "UPTIME"
+    start_bit: 32
+    signal_size: 32
+    unit: "s"
+    c_type: "uint32_t"
+    py_type: "int"
+- key: "therm_state"
+  dbc_name: "THERM_STATE"
+  priority: 6
+  pgn: 65312  # 0xFF20
+  direction: "rx"
   signals:
   - key: "temp_c"
-    signal_name: "TEMP_C"
-    tpe: "float"
+    dbc_name: "TEMP_C"
+    start_bit: 0
+    signal_size: 16
+    signed: true
+    value_scale: 0.01
+    unit: "C"
+    c_type: "double"
+    py_type: "float"
   - key: "temp_v"
-    signal_name: "TEMP_V"
-    tpe: "float"
+    dbc_name: "TEMP_V"
+    start_bit: 16
+    signal_size: 16
+    value_scale: 0.001
+    unit: "V"
+    c_type: "double"
+    py_type: "float"
 - key: "relay_state"
+  dbc_name: "RELAY_STATE"
   priority: 6
+  pgn: 65328  # 0xFF30
+  # pgn: 65457  # 0xFFB1
+  direction: "rx"
   signals:
   - key: "on"
-    signal_name: "RELAY_STATE"
-    tpe: "flag"
+    dbc_name: "RELAY_STATE"
+    start_bit: 0
+    signal_size: 1
+    c_type: "uint8_t"
+    py_type: "flag"
 - key: "relay_cmd"
+  dbc_name: "RELAY_CMD"
   priority: 6
+  pgn: 65329  # 0xFF31
+  # pgn: 65456  # 0xFFB0
+  direction: "tx"
   signals:
   - key: "on"
-    signal_name: "RELAY_STATE"
-    tpe: "flag"
+    dbc_name: "RELAY_STATE"
+    start_bit: 0
+    signal_size: 1
+    c_type: "uint8_t"
+    py_type: "flag"
 node_types:
 - key: "master"
   messages: []
   node_state_class: "brewbot.can.node_state:MasterNodeState"
 - key: "thermometer"
   messages:
-  - key: "temp_state"
-    msg_type_ref: "temp_state"
+  - key: "node_info"
+    msg_type_ref: "node_info"
+    direction: "rx"
+  - key: "therm_state"
+    msg_type_ref: "therm_state"
     direction: "rx"
   node_state_class: "brewbot.can.node_state:ThermometerNodeState"
   mock_class: "brewbot.can.mock:MockThermometer"
 - key: "relay"
   messages:
+  - key: "node_info"
+    msg_type_ref: "node_info"
   - key: "relay_state"
     msg_type_ref: "relay_state"
-    direction: "rx"
   - key: "relay_cmd"
     msg_type_ref: "relay_cmd"
-    direction: "tx"
     frequency: 2.0 # msg / s
   node_state_class: "brewbot.can.node_state:RelayNodeState"
   mock_class: "brewbot.can.mock:MockRelay"
 nodes:
 - key: "master"
-  name: "MASTER_NODE"
   node_type_ref: "master"
   node_addr: 16  # 0x10
-  message_bindings: []
   debug: {}
-# - key: "thermometer_1"
-#   name: "TEMP_NODE_1"
-#   node_type_ref: "thermometer"
-#   node_addr: 112 # 0x70
-#   message_bindings:
-#   - ref_key: "temp_state"
-#     dbc_msg: "TEMP_STATE_1"
-#   params:
-#     window: 10.0 # s
-#   debug:
-#     mock: false
-- key: "thermometer_2"
-  name: "TEMP_NODE_2"
+- key: "therm_01"
   node_type_ref: "thermometer"
-  node_addr: 113 # 0x71
-  message_bindings:
-  - ref_key: "temp_state"
-    dbc_msg: "TEMP_STATE_2"
+  node_addr: 112 # 0x70
   params:
     window: 10.0 # s
   debug:
     mock: false
-- key: "motor_1"
-  name: "MOTOR_NODE_1"
+- key: "therm_02"
+  node_type_ref: "thermometer"
+  node_addr: 113 # 0x71
+  params:
+    window: 10.0 # s
+  debug:
+    mock: false
+- key: "motor_01"
   node_type_ref: "relay"
   node_addr: 128 # 0x80
-  message_bindings:
-  - ref_key: "relay_state"
-    dbc_msg: "MOTOR_STATE_1"
-  - ref_key: "relay_cmd"
-    dbc_msg: "MOTOR_CMD_1"
   debug:
-    mock: true
-- key: "heat_plate_1"
-  name: "HEAT_PLATE_NODE_1"
+    mock: false
+- key: "heat_01"
   node_type_ref: "relay"
   node_addr: 129 # 0x81
-  message_bindings:
-  - ref_key: "relay_state"
-    dbc_msg: "HEAT_PLATE_STATE_1"
-  - ref_key: "relay_cmd"
-    dbc_msg: "HEAT_PLATE_CMD_1"
   debug:
     mock: false
 assembly_types:
@@ -109,10 +160,10 @@ assemblies:
   assembly_type_ref: "kettle"
   nodes:
     thermometer:
-    # - "thermometer_1"
-    - "thermometer_2"
-    motor: "motor_1"
-    heat_plate: "heat_plate_1"
+    - "therm_01"
+    - "therm_02"
+    motor: "motor_01"
+    heat_plate: "heat_01"
   params:
     - name: volume
       value: 30.0 # l

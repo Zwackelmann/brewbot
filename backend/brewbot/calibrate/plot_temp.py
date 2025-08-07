@@ -28,18 +28,20 @@ class RecGroup:
 
 def time_plot(recs, dfs, ax1):
 
-    for df in dfs:
-        # Plot real_temp_c on the left y-axis
-        ax1.plot(df.index, df['real_temp_c_smoothed'], color='blue', label='Real Temp (C)')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Real Temp (C)', color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
+    # for df in dfs:
 
-        # Create a second y-axis for can_temp_v
-        ax2 = ax1.twinx()
-        ax2.plot(df.index, df['can_temp_v_smoothed'], color='red', label='CAN Temp (V)')
-        ax2.set_ylabel('CAN Temp (V)', color='red')
-        ax2.tick_params(axis='y', labelcolor='red')
+    df = pd.concat(dfs)
+    # Plot real_temp_c on the left y-axis
+    ax1.plot(df.index, df['real_temp_c_smoothed'], color='blue', label='Real Temp (C)')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Real Temp (C)', color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+
+    # Create a second y-axis for can_temp_v
+    ax2 = ax1.twinx()
+    ax2.plot(df.index, df['can_temp_v_smoothed'], color='red', label='CAN Temp (V)')
+    ax2.set_ylabel('CAN Temp (V)', color='red')
+    ax2.tick_params(axis='y', labelcolor='red')
 
     plt.xticks(rotation=45)
 
@@ -60,8 +62,8 @@ def temp_to_v_means_plot(recs, dfs, ax1):
 
         temps = list(means.index)
         vs = list(means.values)
-        poly_temp2v = np.polyfit(temps, vs, deg=2)
-        poly_v2temp = np.polyfit(vs, temps, deg=2)
+        poly_temp2v = np.polyfit(temps, vs, deg=1)
+        poly_v2temp = np.polyfit(vs, temps, deg=1)
         p_vs = list(np.polyval(poly_temp2v, temps))
         p_temps = list(np.polyval(poly_v2temp, p_vs))
 
@@ -72,7 +74,7 @@ def temp_to_v_means_plot(recs, dfs, ax1):
         log_vs = list(np.polyval(poly_temp2v, log_temps))
         log_str = ", ".join([f"v {t}: {v:1.3f}" for t, v in zip(log_temps, log_vs)])
 
-        print(poly_temp2v)
+        print(poly_v2temp)
         print(f"mean error: {mean_error:1.4f}, {log_str}, v diff: {log_vs[-1]-log_vs[0]:1.3f}")
 
         ax1.plot(temps, p_vs)
@@ -115,6 +117,7 @@ def smoothed_plot(recs, dfs, ax1):
         time_smooth = time_smooth[rec.post_smooth_slc]
         temps_smooth = temps_smooth[rec.post_smooth_slc]
         voltages_smooth = voltages_smooth[rec.post_smooth_slc]
+        print(voltages_smooth)
 
         volt_to_temp_df = pd.DataFrame({'voltage': voltages_smooth, 'temp': temps_smooth})
         bin_width = 0.1
@@ -270,13 +273,122 @@ def main():
         )
     ]
 
-    recs = recs_v3_board_2
+    # V4 board with inductor
+    recs_v4_board = [
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T18-16-06.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T18-23-36.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T18-58-54.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T19-39-35.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T20-24-51.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T20-51-16.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T21-13-33.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T21-15-58.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T21-44-06.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T21-49-24.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T22-09-41.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T22-12-45.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T22-37-17.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T22-48-04.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+        RecSequence(
+            file_path="recordings/rec_2025-08-03T23-20-30.txt",
+            slc=slice(None, None),
+            temp_spline_divider=10,
+            voltage_filter_sigma=10,
+            post_smooth_slc=slice(None, None)
+        ),
+    ]
+
+    recs = recs_v4_board
 
     # show_plot = "temp_to_v"
-    # show_plot = "time"
-    show_plot = "smoothed"
+    show_plot = "time"
+    # show_plot = "smoothed"
 
-    v_factor = 5.033 / 5.0  # real voltage measured at can module / max voltage assumed in can message
+    v_factor = 5.0 / 5.0  # real voltage measured at can module / max voltage assumed in can message
     rolling_window = 5
 
     dfs = []

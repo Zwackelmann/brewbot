@@ -3,10 +3,10 @@
 #include <mcp2515.h>
 #include "util.h"
 
-#define HEAT_PLATE_CMD_PGN    0xFFA0
-#define HEAT_PLATE_STATE_PGN  0xFFA1
+#define HEAT_PLATE_CMD_PGN    0xFF31
+#define HEAT_PLATE_STATE_PGN  0xFF30
 #define PRIORITY     6
-#define NODE_ADDR    0x80
+#define NODE_ADDR    0x81
 #define MASTER_ADDR  0x10
 
 #define RELAY_PIN      3

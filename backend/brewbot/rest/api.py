@@ -50,6 +50,7 @@ async def init_app_state(_app: FastAPI):
 
     app_state.conf = conf
     app_state.can_env = CanEnv(conf)
+    print(app_state.can_env.assemblies)
 
     _app.state.app_state = app_state
 
@@ -64,29 +65,29 @@ async def shutdown_can_env(_app: FastAPI):
     await app_state.can_env.stop()
 
 
-@app.get("/kettle/{kettle_name}/temp")
-async def get_temp_state_route(kettle_name):
+@app.get("/kettle/{kettle_name}/therm")
+async def get_therm_state_route(kettle_name):
     app_state: AppState = app.state.app_state
     can_env: CanEnv = app_state.can_env
 
     kettle = can_env.assemblies.get(kettle_name)
     if kettle is None:
         return JSONResponse(status_code=400, content={
-            "action": "get_temp_state",
+            "action": "get_therm_state",
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
-            "action": "get_temp_state",
+            "action": "get_therm_state",
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"}
         })
     else:
         return JSONResponse(status_code=200, content={
-            "action": "get_temp_state",
+            "action": "get_therm_state",
             "status": "success",
-            "data": kettle.temp_state
+            "data": kettle.therm_state
         })
 
 
@@ -101,7 +102,7 @@ async def set_heat_plate_route(kettle_name, on_off):
             "action": "set_heat_plate",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"},
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"},
             "data": {"relay_state": on_off}
         })
     elif not isinstance(kettle, KettleAssembly):
@@ -109,7 +110,7 @@ async def set_heat_plate_route(kettle_name, on_off):
             "action": "set_heat_plate",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"},
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"},
             "data": {"relay_state": on_off}
         })
     else:
@@ -133,7 +134,7 @@ async def set_steering_state_route(kettle_name, on_off):
             "action": "set_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"},
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"},
             "data": {"relay_state": on_off}
         })
     elif not isinstance(kettle, KettleAssembly):
@@ -141,7 +142,7 @@ async def set_steering_state_route(kettle_name, on_off):
             "action": "set_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"},
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"},
             "data": {"relay_state": on_off}
         })
     else:
@@ -165,14 +166,14 @@ async def get_heat_plate_state_route(kettle_name):
             "action": "get_heat_plate_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
             "action": "get_heat_plate_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"}
         })
     else:
         return JSONResponse(status_code=200, content={
@@ -194,14 +195,14 @@ async def get_steering_state_route(kettle_name):
             "action": "get_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
             "action": "get_steering_state",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"}
         })
     else:
         return JSONResponse(status_code=200, content={
@@ -223,14 +224,14 @@ async def set_temp_setpoint_route(kettle_name, r: float = Query(None, descriptio
             "action": "set_temp_setpoint",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly does not exist: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly does not exist: {kettle_name}"}
         })
     elif not isinstance(kettle, KettleAssembly):
         return JSONResponse(status_code=400, content={
             "action": "set_temp_setpoint",
             "kettle_name": kettle_name,
             "status": "error",
-            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle}"}
+            "error": {"code": 400, "msg": f"assembly is not a kettle: {kettle_name}"}
         })
     else:
         kettle.set_heat_plate_setpoint(r)

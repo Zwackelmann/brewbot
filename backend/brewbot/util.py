@@ -172,3 +172,17 @@ def avg_dict(dict_list: list[dict[str, float]]) -> dict[str, float]:
 
     res = {k: [v for v in vs if v is not None and not np.isnan(v)] for k, vs in res.items()}
     return {k: float(np.mean(vs)) if len(vs) != 0 else None for k, vs in res.items()}
+
+
+def int_range(bits: int, signed: bool):
+    if bits < 1:
+        raise ValueError("Bit size must be >= 1")
+
+    if signed:
+        min_val = -(1 << (bits - 1))
+        max_val = (1 << (bits - 1)) - 1
+    else:
+        min_val = 0
+        max_val = (1 << bits) - 1
+
+    return min_val, max_val
