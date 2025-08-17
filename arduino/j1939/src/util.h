@@ -12,6 +12,7 @@
 #define VERSION_MINOR 10
 #define VERSION_PATCH 23
 
+/* NodeType */
 enum class NodeType : uint8_t {
   Unknown     = 0,
   Thermometer = 1,
@@ -20,6 +21,38 @@ enum class NodeType : uint8_t {
 };
 
 
+/* Scheduler */
+static inline bool time_due(uint32_t now, uint32_t next) {
+  return (int32_t)(now - next) >= 0;
+}
+
+using schedule_handler_t = void (*)();
+
+struct schedule_item_t {
+  uint32_t period_ms;
+  uint32_t next_at;
+  schedule_handler_t f;
+};
+
+template<size_t N>
+struct Scheduler {
+  schedule_item_t items[N];
+
+  void tick() {
+    const uint32_t now = millis();
+    for (size_t i = 0; i < N; ++i) {
+      auto &it = items[i];
+      if (!it.f) continue;
+      if (time_due(now, it.next_at)) {
+        it.f();
+        // catch-up: preserve phase if we slipped
+        do { it.next_at += it.period_ms; } while (time_due(now, it.next_at));
+      }
+    }
+  }
+};
+
+/* J1939 */
 class J1939 {
 public:
   static constexpr uint8_t ANY_ADDR = 0xFEu;  // not a real address
@@ -385,7 +418,7 @@ private:
   size_t     _n;
 };
 
-
+/* Message Dispatcher */
 class RelayCmdDisp {
 public:
   using handler_t = void (*)(uint8_t, void*);
@@ -395,6 +428,48 @@ public:
   static constexpr size_t   DLC      = 8;
 
   RelayCmdDisp() : _handler(_handle_noop), _ctx(nullptr) {}
+
+  static inline void prepare(can_frame* frame, const uint8_t src, const uint8_t dest = J1939::BROADCAST_ADDR) noexcept {
+    frame->can_id = J1939::pgn_to_can_id(PGN, PRIORITY, src, dest) | CAN_EFF_FLAG;
+    frame->can_dlc = DLC;
+
+    std::memset(frame->data, 0, sizeof frame->data);
+  }
+
+  static inline uint8_t decode_signal_on(const can_frame* frame) noexcept {
+    return J1939::decode_uint(frame->data, DLC, 0, 1);
+  }
+  static inline bool encode_signal_on(can_frame* frame, const uint8_t v) noexcept {
+    if (v > 1) return false;
+    return J1939::encode_uint(v, frame->data, DLC, 0, 1);
+  }
+
+  void dispatch_frame(const can_frame* frame) noexcept {
+    const uint8_t on = decode_signal_on(frame);
+    _handler(on, _ctx);
+  }
+
+  void set_handler(handler_t h, void* ctx=nullptr) noexcept {
+    _handler = h ? h : _handle_noop;
+    _ctx = ctx;
+  }
+
+private:
+  static void _handle_noop(uint8_t, void*) {}
+  handler_t _handler;
+  void* _ctx;
+};
+
+
+class RelayStatusDisp {
+public:
+  using handler_t = void (*)(uint8_t, void*);
+
+  static constexpr uint32_t PGN      = 0xFF11u;
+  static constexpr uint8_t  PRIORITY = 6u;
+  static constexpr size_t   DLC      = 8;
+
+  RelayStatusDisp() : _handler(_handle_noop), _ctx(nullptr) {}
 
   static inline void prepare(can_frame* frame, const uint8_t src, const uint8_t dest = J1939::BROADCAST_ADDR) noexcept {
     frame->can_id = J1939::pgn_to_can_id(PGN, PRIORITY, src, dest) | CAN_EFF_FLAG;
