@@ -3,7 +3,6 @@
 #include <cstring>
 #include "util.h"
 
-
 static inline void clear8(uint8_t *b) { std::memset(b, 0, 8); }
 
 // ---------- Unsigned roundtrip ----------
@@ -303,7 +302,7 @@ TEST(PackedFrame, CaseC) {
 
 
 TEST(CanFrame, RelayCmdThroughJ1939) {
-  RelayCmd relay;
+  RelayCmdDisp relay;
   struct Spy { bool called=false; uint8_t on=0; } spy;
   relay.set_handler(
     [](uint8_t on, void* ctx){
@@ -314,16 +313,85 @@ TEST(CanFrame, RelayCmdThroughJ1939) {
   );
 
   J1939 bus;
-  ASSERT_TRUE(bus.append_rx_msg<RelayCmd>(&relay, MASTER_ADDR, NODE_ADDR));
+  ASSERT_TRUE(bus.register_disp<RelayCmdDisp>(&relay, MASTER_ADDR, NODE_ADDR));
 
   can_frame f{};
-  f.can_id  = J1939::pgn_to_can_id(RelayCmd::PGN, RelayCmd::PRIORITY, MASTER_ADDR, NODE_ADDR) | CAN_EFF_FLAG;
-  f.can_dlc = RelayCmd::DLC;
-  std::memset(f.data, 0, sizeof f.data);
-  ASSERT_TRUE(RelayCmd::encode_signal_on(1, f.data));
+  RelayCmdDisp::prepare(&f, MASTER_ADDR, NODE_ADDR);
+  ASSERT_TRUE(RelayCmdDisp::encode_signal_on(&f, 1));
 
   bus.process_frame(&f);
 
   EXPECT_TRUE(spy.called);
   EXPECT_EQ(spy.on, 1u);
+}
+
+
+TEST(CanFrame, NodeInfoDispJ1939) {
+  NodeInfoDisp node_info;
+
+  struct Spy { bool called=false; } spy;
+
+  node_info.set_handler(
+    [](uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint32_t, void* ctx) {
+      auto* s = static_cast<Spy*>(ctx);
+      s->called = true;
+    },
+    &spy
+  );
+
+  J1939 bus;
+  ASSERT_TRUE(bus.register_disp<NodeInfoDisp>(&node_info));
+
+  can_frame f{};
+  NodeInfoDisp::prepare(&f, NODE_ADDR, MASTER_ADDR);
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_node_type(&f, static_cast<uint8_t>(NODE_TYPE)));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_node_id(&f, NODE_ID));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_major(&f, VERSION_MAJOR));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_minor(&f, VERSION_MINOR));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_patch(&f, VERSION_PATCH));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_uptime(&f, 10101010));
+
+  bus.process_frame(&f);
+  EXPECT_TRUE(spy.called);
+}
+
+
+TEST(CanFrame, NodeInfoDispJ19392) {
+  NodeInfoDisp node_info;
+
+  struct Spy {
+    bool called=false;
+    uint8_t node_type=0, node_id=0, maj=0, min=0, pat=0;
+    uint32_t up=0;
+  } spy;
+
+  node_info.set_handler(
+    [](uint8_t t, uint8_t id, uint8_t maj, uint8_t min, uint8_t pat, uint32_t up, void* ctx) {
+      auto* s = static_cast<Spy*>(ctx);
+      s->called = true; s->node_type=t; s->node_id=id;
+      s->maj=maj; s->min=min; s->pat=pat; s->up=up;
+    }, &spy
+  );
+
+  J1939 bus;
+  ASSERT_TRUE(bus.register_disp<NodeInfoDisp>(&node_info)); 
+
+  can_frame f{};
+  NodeInfoDisp::prepare(&f, /*src=*/NODE_ADDR, /*dest=*/MASTER_ADDR);
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_node_type(&f, static_cast<uint8_t>(NodeType::Thermometer)));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_node_id(&f, 1));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_major(&f, 1));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_minor(&f, 0));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_version_patch(&f, 11));
+  ASSERT_TRUE(NodeInfoDisp::encode_signal_uptime(&f, 10101010));
+
+  ASSERT_TRUE(bus.process_frame(&f));
+
+  EXPECT_TRUE(spy.called);
+  EXPECT_EQ(spy.node_type, 1);
+  EXPECT_EQ(spy.node_id, 1);
+  EXPECT_EQ(spy.maj, 1);
+  EXPECT_EQ(spy.min, 0);
+  EXPECT_EQ(spy.pat, 11);
+  EXPECT_EQ(spy.up, 10101010u);
 }
