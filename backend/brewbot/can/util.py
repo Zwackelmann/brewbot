@@ -1,3 +1,5 @@
+from typing import Tuple
+
 def pdu_format(pgn: int) -> int:
     return (pgn >> 8) & 0xFF
 
@@ -13,6 +15,7 @@ def is_pdu_format_2(pgn: int) -> bool:
 def pgn_to_can_id(pgn: int, priority: int, src_addr: int, dest_addr: int) -> int:
     pgn_encoded = pgn
     if is_pdu_format_1(pgn):
+        pgn_encoded &= 0xFF00  # clear dest_addr part
         pgn_encoded |= (dest_addr & 0xFF)
 
     dp = (pgn_encoded >> 16) & 0x1
@@ -29,7 +32,7 @@ def pgn_to_can_id(pgn: int, priority: int, src_addr: int, dest_addr: int) -> int
     return can_id
 
 
-def can_id_to_pgn(can_id: int) -> (int, int, int, int):
+def can_id_to_pgn(can_id: int) -> Tuple[int, int, int, int]:
     src_addr = can_id & 0xFF
     ps = (can_id >> 8) & 0xFF
     pf = (can_id >> 16) & 0xFF

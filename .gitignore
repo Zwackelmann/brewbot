@@ -2,3 +2,4 @@
 brewbot.iml
 __pycache__
 /backend/recordings/*.txt
+/arduino/j1939/build/

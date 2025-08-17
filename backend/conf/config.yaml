@@ -9,7 +9,7 @@ message_types:
 - key: "node_info"
   dbc_name: "NODE_INFO"
   priority: 6
-  pgn: 65296  # 0xFF10
+  pgn: 65280  # 0xFF00
   direction: "rx"
   signals:
   - key: "node_type"
@@ -52,7 +52,7 @@ message_types:
 - key: "therm_state"
   dbc_name: "THERM_STATE"
   priority: 6
-  pgn: 65312  # 0xFF20
+  pgn: 65296  # 0xFF10
   direction: "rx"
   signals:
   - key: "temp_c"
@@ -75,8 +75,7 @@ message_types:
 - key: "relay_state"
   dbc_name: "RELAY_STATE"
   priority: 6
-  pgn: 65328  # 0xFF30
-  # pgn: 65457  # 0xFFB1
+  pgn: 65297  # 0xFF11
   direction: "rx"
   signals:
   - key: "on"
@@ -88,8 +87,7 @@ message_types:
 - key: "relay_cmd"
   dbc_name: "RELAY_CMD"
   priority: 6
-  pgn: 65329  # 0xFF31
-  # pgn: 65456  # 0xFFB0
+  pgn: 4096  # 0x1000
   direction: "tx"
   signals:
   - key: "on"
